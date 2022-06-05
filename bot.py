@@ -50,7 +50,7 @@ def get_ntk_quantity():
 
 
 # BOT HANDLERS ---------------------
-@dp.message_handler(Command("ntk", prefixes='!/'))
+@dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
 async def ntk(msg: types.Message):
     q = get_ntk_quantity()
     await msg.answer(f'В NTK сейчас людей: {q}')
