@@ -2,17 +2,15 @@
 import requests
 from bs4 import BeautifulSoup
 
-# TELEGRAM BOT
-import aiogram
+# TELEGRAM BOT API
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Command, BoundFilter
 
-# DOT ENV
+# OTHER
 import os
 from dotenv import load_dotenv
-
-# OTHER
 import csv
+
 
 # GET BOT TOKEN
 load_dotenv()
@@ -35,10 +33,6 @@ class AdminFilter(BoundFilter):
 class NtkGroup(BoundFilter):
     async def check(self, message: types.Message) -> bool:
         return message.chat.id == -1001684546093
-
-# class BotState(BoundFilter):
-#     async def check(self, message: types.Message) -> bool:
-#         return bot_state() == 1
 
 
 def setup(dp: Dispatcher):
@@ -67,8 +61,6 @@ def get_ntk_quantity():
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'lxml')
     body = soup.find_all('div', class_='panel-body text-center lead')
-    # for i in body:
-    #     q = i.find('span').text
     return body[0].text.strip()
 
 
@@ -85,35 +77,12 @@ async def ask_ntk(msg: types.Message):
     text = """
     Хай, моя задача в этой жизни показывать количество людей в НТК!
 
-    GitHub:
+    GitHub: github.com/vsem-azamat/ntk_bot
     admin: t.me/vsem_azamat
     """
-    await msg.answer(text)
+    await msg.answer(text, disable_web_page_preview=True)
     await msg.delete()
 
-# @dp.message_handler(Command('ntk_state', prefixes='!/'), AdminFilter())
-# async def state_bot(msg: types.Message):
-#     state_dict = {'off': 0, 'on': 1}
-#     try:
-#         state_new = msg.text.lower().split()[1]
-#         # CHANGE STATE OF BOT
-#         print(state_new)
-#         if state_new in state_dict:
-#             state = bot_state(state_dict.get(state_new))
-#             raise IndexError
-#
-#         # ERROR: UNCORRECT PARAMETER OF COMMAND
-#         else:
-#             await msg.answer("Неверна задана команда!\n\nПример:\n/ntk_state off\n/ntk_state on\n/ntk_state")
-#
-#     # GET STATE OF BOT
-#     except IndexError:
-#         state_text_dict = {0: 'выключен', 1: 'включен'}
-#         state = bot_state()
-#         print(state)
-#         print(type(state))
-#         await msg.answer(f'Бот сейчас {state_text_dict.get(state)}')
-#     await msg.delete()
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
