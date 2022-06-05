@@ -32,7 +32,7 @@ class AdminFilter(BoundFilter):
 
 class NtkGroup(BoundFilter):
     async def check(self, message: types.Message) -> bool:
-        return message.chat.id == -1001684546093
+        return message.chat.id in [-1001684546093, -1001384533622]
 
 
 def setup(dp: Dispatcher):
