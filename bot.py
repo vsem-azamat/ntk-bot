@@ -9,7 +9,6 @@ from aiogram.dispatcher.filters import Command, BoundFilter
 # OTHER
 import os
 from dotenv import load_dotenv
-import csv
 
 # GET BOT TOKEN
 load_dotenv()
