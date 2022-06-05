@@ -41,21 +41,6 @@ def setup(dp: Dispatcher):
 
 # FUNCTIONS ----------------------
 
-def bot_state(change=None):
-    # get state
-    r = csv.reader(open('bot_state.csv'))
-    state = list(r)
-    if change is None:
-        return int(state[0][0])
-
-    # change and get state
-    else:
-        with open('eggs.csv', 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
-            writer.writerow(str(change))
-        return int(bot_state())
-
-
 def get_ntk_quantity():
     url = 'https://www.techlib.cz/en/'
     response = requests.get(url)
