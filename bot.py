@@ -11,7 +11,6 @@ import os
 from dotenv import load_dotenv
 import csv
 
-
 # GET BOT TOKEN
 load_dotenv()
 BOT_TOKEN = str(os.getenv('BOT_TOKEN'))
@@ -20,15 +19,8 @@ BOT_TOKEN = str(os.getenv('BOT_TOKEN'))
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
-admin = int(os.getenv('ADMIN'))  # admin telegram id
 
-
-# FILTERS ------------------------
-class AdminFilter(BoundFilter):
-    async def check(self, message: types.Message) -> bool:
-        member = await message.chat.get_member(message.from_user.id)
-        return member.is_chat_admin() == admin or message.from_user.id == admin
-
+# Filter
 
 class NtkGroup(BoundFilter):
     async def check(self, message: types.Message) -> bool:
@@ -36,7 +28,7 @@ class NtkGroup(BoundFilter):
 
 
 def setup(dp: Dispatcher):
-    dp.filters_factory.bind(AdminFilter)
+    dp.filters_factory.bind(NtkGroup)
 
 
 # FUNCTIONS ----------------------
@@ -53,7 +45,10 @@ def get_ntk_quantity():
 @dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
 async def ntk(msg: types.Message):
     q = get_ntk_quantity()
-    await msg.answer(f'В NTK сейчас людей: {q}')
+    text = f'В NTK сейчас людей: {q}'
+    if int(q) >= 700:
+        text = text + '\nДохуя крч.'
+    await msg.answer(text)
     await msg.delete()
 
 
@@ -61,6 +56,7 @@ async def ntk(msg: types.Message):
 async def ask_ntk(msg: types.Message):
     text = """
     Хай, моя задача в этой жизни показывать количество людей в НТК!
+Используй комманду '/ntk'
 
 GitHub: github.com/vsem-azamat/ntk_bot
 admin: t.me/vsem_azamat
