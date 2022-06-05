@@ -62,8 +62,8 @@ async def ask_ntk(msg: types.Message):
     text = """
     Хай, моя задача в этой жизни показывать количество людей в НТК!
 
-    GitHub: github.com/vsem-azamat/ntk_bot
-    admin: t.me/vsem_azamat
+GitHub: github.com/vsem-azamat/ntk_bot
+admin: t.me/vsem_azamat
     """
     await msg.answer(text, disable_web_page_preview=True)
     await msg.delete()
