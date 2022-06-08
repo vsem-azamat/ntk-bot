@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 # TELEGRAM BOT API
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Command, BoundFilter
+from aiogram.utils.markdown import hlink
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # OTHER
 import os
@@ -15,7 +17,7 @@ load_dotenv()
 BOT_TOKEN = str(os.getenv('BOT_TOKEN'))
 
 # Initialize bot and dispatcher
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
@@ -40,27 +42,49 @@ def get_ntk_quantity():
     return body[0].text.strip()
 
 
+def get_duplex_events() -> str:
+    url = 'https://www.duplex.cz/'
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'lxml')
+    d_list = soup.find_all('div', class_='col-sm-6 col-md-4 col-lg-3 archive-event')
+
+    text = """💃<b>Duplex events:💃</b>"""
+    for i in d_list:
+        event_title = i.find('div', class_='event_title').text
+        event_link = i.find('a', class_='event_title_link clearfix', href=True)['href']
+        text += hlink(f'\n\n🎤{event_title}', event_link)
+    return text
+
+
 # BOT HANDLERS ---------------------
 @dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
 async def ntk(msg: types.Message):
     q = get_ntk_quantity()
-    text = f'В NTK сейчас людей: {q}'
+    text = f'📚В NTK сейчас людей: {q}'
     if int(q) >= 700:
-        text = text + '\nДохуя крч.'
+        text += '\nДохуя крч.'
     await msg.answer(text)
     await msg.delete()
 
 
 @dp.message_handler(Command('help', prefixes='!/'), NtkGroup())
 async def ask_ntk(msg: types.Message):
-    text = """
-    Хай, моя задача в этой жизни показывать количество людей в НТК!
-Используй комманду '/ntk'
+    text = """<b>Хай, я создан для чата @chat_nkt!</b>
+
+Команды:
+/ntk - Показать кол-во людей в NTK
+/duplex - Duplex Events <i>(без комментариев)</i>,.
 
 GitHub: github.com/vsem-azamat/ntk_bot
 admin: t.me/vsem_azamat
     """
     await msg.answer(text, disable_web_page_preview=True)
+    await msg.delete()
+
+
+@dp.message_handler(Command('duplex', prefixes='!/'), NtkGroup())
+async def gen_duplex(msg: types.Message):
+    await msg.answer(get_duplex_events(), disable_web_page_preview=True)
     await msg.delete()
 
 
