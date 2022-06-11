@@ -47,7 +47,7 @@ def get_duplex_events() -> str:
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'lxml')
     d_list = soup.find_all('div', class_='col-sm-6 col-md-4 col-lg-3 archive-event')
-g
+
     text = """💃<b>Duplex events:💃</b>"""
     for i in d_list:
         event_title = i.find('div', class_='event_title').text
