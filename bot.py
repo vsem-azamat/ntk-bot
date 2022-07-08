@@ -73,7 +73,7 @@ async def ntk(msg: types.Message):
 
 @dp.message_handler(Command('help', prefixes='!/'), NtkGroup())
 async def ask_ntk(msg: types.Message):
-    text = """<b>Хай, я создан для чата @chat_nkt!</b>
+    text = """<b>Хай, я создан для чата @chat_ntk!</b>
 
 Команды:
 /ntk - Показать кол-во людей в NTK
