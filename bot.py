@@ -1,16 +1,13 @@
-# FOR SCRAPING
-import requests
-from bs4 import BeautifulSoup
-
 # TELEGRAM BOT API
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Command, BoundFilter
-from aiogram.utils.markdown import hlink
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # OTHER
 import os
+import asyncio
 from dotenv import load_dotenv
+from parse_functions import get_duplex_events, recieve_ntk_data, get_ntk_quantity
+
 
 # GET BOT TOKEN
 load_dotenv()
@@ -21,8 +18,11 @@ bot = Bot(token=BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
-# Filter
+async def on_startup(dp):
+    asyncio.create_task(recieve_ntk_data())
 
+
+# Filter
 class NtkGroup(BoundFilter):
     async def check(self, message: types.Message) -> bool:
         return message.chat.id in [-1001684546093, -1001384533622]
@@ -32,38 +32,10 @@ def setup(dp: Dispatcher):
     dp.filters_factory.bind(NtkGroup)
 
 
-# FUNCTIONS ----------------------
-
-def get_ntk_quantity():
-    url = 'https://www.techlib.cz/en/'
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'lxml')
-    body = soup.find_all('div', class_='panel-body text-center lead')
-    return body[0].text.strip()
-
-
-def get_duplex_events() -> str:
-    url = 'https://www.duplex.cz/'
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'lxml')
-    d_list = soup.find_all('div', class_='col-sm-6 col-md-4 col-lg-3 archive-event')
-
-    text = """💃<b>Duplex events:💃</b>"""
-    for i in d_list:
-        event_title = i.find('div', class_='event_title').text
-        event_link = i.find('a', class_='event_title_link clearfix', href=True)['href']
-        text += hlink(f'\n\n🎤{event_title}', event_link)
-    return text
-
-
-def gen_graf():
-    pass
-
-
 # BOT HANDLERS ---------------------
 @dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
 async def ntk(msg: types.Message):
-    q = get_ntk_quantity()
+    q = await get_ntk_quantity()
     text = f'📚В NTK сейчас людей: {q}'
     if int(q) >= 700:
         text += '\nДохуя крч.'
@@ -119,12 +91,14 @@ async def anon_message(msg: types.Message):
     if msg.chat.id == msg.from_user.id and msg.from_user.id not in black_list_of_users:
         if 1 < len(text_anon) < 1000:
             # filter for bad words
-            bad_words = [
-                    "шлюх", "хохол", "рашист", 
-                    "рашк", "шкур", "уеб", "блядь", 
-                    "русн", "хохл", "шалав",
-                    "целка", "целки"
-                    ]
+
+            bad_words = []
+
+            with open('bad_words.txt', 'r') as file:
+                for line in file:
+                    word = line.strip()
+                    bad_words.append(word)
+
             for word in bad_words:
                 if word in text_anon:
                     await bot.send_message(
@@ -142,9 +116,12 @@ async def anon_message(msg: types.Message):
 
 @dp.message_handler(Command('duplex', prefixes='!/'), NtkGroup())
 async def gen_duplex(msg: types.Message):
-    await msg.answer(get_duplex_events(), disable_web_page_preview=True)
+    text = await get_duplex_events()
+    await msg.answer(text, disable_web_page_preview=True)
     await msg.delete()
 
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, on_startup=on_startup, skip_updates=True)
+
+    
