@@ -23,14 +23,22 @@ class Config:
     except TypeError:
         DELTA_TIME_FOR_RECIEVE_NTK: int = 20
 
+    try:
+        SUPER_ADMINS: int = [int(id_admin) for id_admin in os.getenv('SUPER_ADMINS').split(',')]
+    except TypeError:
+        SUPER_ADMINS: list[int] = []
+    
+
 config = Config()
+
 
 # FILTERS
 class NtkGroup(BoundFilter):
     async def check(self, msg: types.Message) -> bool:
         return \
             msg.chat.id in [config.ID_NTK_BIG_CHAT, config.ID_NTK_BIG_CHAT] or \
-            msg.from_user.id not in config.BLACK_LIST_OF_USERS
+            msg.from_user.id not in config.BLACK_LIST_OF_USERS or \
+            msg.from_id.id in config.SUPER_ADMINS
 
 
 class BlackList(BoundFilter):
@@ -38,7 +46,13 @@ class BlackList(BoundFilter):
         return msg.from_user.id not in config.BLACK_LIST_OF_USERS
     
 
+class SuperAdmins(BoundFilter):
+    async def check(self, msg: types.Message) -> bool:
+        return msg.from_user.id in config.SUPER_ADMINS
+    
+
 # init filters
 def setup(dp: Dispatcher):
     dp.filters_factory.bind(NtkGroup)
     dp.filters_factory.bind(BlackList)
+    dp.filters_factory.bind(SuperAdmins)

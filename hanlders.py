@@ -4,7 +4,7 @@ from aiogram import types
 from aiogram.dispatcher.filters import Command
 
 from bot import dp, bot
-from configs import config, NtkGroup, BlackList 
+from configs import config, NtkGroup, BlackList, SuperAdmins
 from parse_functions import get_duplex_events, get_ntk_quantity, make_day_graph
 
 
@@ -84,7 +84,7 @@ async def gen_duplex(msg: types.Message):
     await msg.delete()
 
 
-@dp.message_handler(Command('graph', prefixes='!/'))
+@dp.message_handler(Command('graph', prefixes='!/'), SuperAdmins())
 async def send_stats(msg: types.Message):
     image = await make_day_graph()
     await bot.send_photo(
