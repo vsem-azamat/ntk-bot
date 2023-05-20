@@ -4,3 +4,5 @@ venv
 .idea
 __pycache__
 ntk_data.txt
+.bot.py.swo
+test.py
