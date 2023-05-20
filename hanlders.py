@@ -1,10 +1,11 @@
-# TELEGRAM BOT API
+from datetime import datetime, timedelta
+
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 
 from bot import dp, bot
 from configs import config, NtkGroup, BlackList 
-from parse_functions import get_duplex_events, get_ntk_quantity
+from parse_functions import get_duplex_events, get_ntk_quantity, make_day_graph
 
 
 @dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
@@ -81,3 +82,13 @@ async def gen_duplex(msg: types.Message):
     text = await get_duplex_events()
     await msg.answer(text, disable_web_page_preview=True)
     await msg.delete()
+
+
+@dp.message_handler(Command('graph', prefixes='!/'))
+async def send_stats(msg: types.Message):
+    image = await make_day_graph()
+    await bot.send_photo(
+        chat_id=msg.from_user.id,
+        photo=types.InputFile(image, filename='graph')
+    )
+    
