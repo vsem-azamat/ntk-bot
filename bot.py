@@ -4,19 +4,19 @@ from aiogram import Bot, Dispatcher, types
 # OTHER
 import asyncio
 from parse_functions import recieve_ntk_data
-from configs import Config, NtkGroup
+from configs import config
 
 
 # Initialize bot and dispatcher
-bot = Bot(token=Config.BOT_TOKEN, parse_mode=types.ParseMode.HTML)
+bot = Bot(token=config.BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
 async def on_startup(dp):
-    from configs import NtkGroup
+    from configs import setup
 
-    dp.filters_factory.bind(NtkGroup)
-    asyncio.create_task(recieve_ntk_data(Config.DELTA_TIME_FOR_RECIEVE_NTK))
+    setup(dp)
+    asyncio.create_task(recieve_ntk_data(config.DELTA_TIME_FOR_RECIEVE_NTK))
 
 
 if __name__ == '__main__':
