@@ -29,7 +29,7 @@ async def get_duplex_events() -> str:
     return text
 
 async def recieve_ntk_data():
-    delta_time = 2
+    delta_time = 20
     time_list = await generaet_time_list(delta_time)
 
     while True:
@@ -41,4 +41,4 @@ async def recieve_ntk_data():
                 file.write(f"{date} {current_time} - {quantity_ntk}\n")
             await asyncio.sleep(delta_time*60-60)
         else:
-            time.sleep(1)
+            await asyncio.sleep(1)
