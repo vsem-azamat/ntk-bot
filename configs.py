@@ -10,16 +10,18 @@ class Config:
     main.load_dotenv()
     
     BOT_TOKEN: str = str(os.getenv('BOT_TOKEN'))
-    DELTA_TIME_FOR_RECIEVE_NTK: int = int(os.getenv('DELTA_TIME'))
     ID_NTK_BIG_CHAT: int = -1001684546093
     ID_NTK_SMALL_CHAT: int = -1001384533622
-
     BLACK_LIST_OF_USERS = [2132881105, ]
     BAD_WORDS = []
     with open('bad_words.txt', 'r') as file:
         for line in file:
             word = line.strip()
             BAD_WORDS.append(word)
+    try:
+        DELTA_TIME_FOR_RECIEVE_NTK: int = int(os.getenv('DELTA_TIME'))
+    except TypeError:
+        DELTA_TIME_FOR_RECIEVE_NTK: int = 20
 
 config = Config()
 
