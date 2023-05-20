@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
+from typing import List
 
 
-async def generaet_time_list(delta_time:int):
+async def generaet_time_list(delta_time: int = 20) -> List[str]:
     start_time = "08:00"
     end_time = "02:00"
 
