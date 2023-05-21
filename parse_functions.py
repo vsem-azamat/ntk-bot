@@ -49,26 +49,22 @@ async def recieve_ntk_data(delta_time: int = 20):
 
 
 async def get_values_ntk_visits(start_datetime: datetime, end_datetime: datetime) -> List[List]:
-    with open('ntk_data.txt', 'r') as file:
-        x_dates = []
-        y_values = []
-        for row in file:
-            day, time, _, count = row.split(' ')
-            row_datetime = datetime.strptime(f'{day} {time}', '%Y-%m-%d %H:%M')
-            count = int(count[:-1])
-            if start_datetime <= row_datetime <= end_datetime:
-                x_dates.append(row_datetime)
-                y_values.append(count)
-        return x_dates, y_values
+    def read_file() -> List[List]:
+        with open('ntk_data.txt', 'r') as file:
+            for row in file:
+                day, time, _, count = row.split(' ')
+                row_datetime = datetime.strptime(f'{day} {time}', '%Y-%m-%d %H:%M')
+                count = int(count[:-1])
+                if start_datetime <= row_datetime <= end_datetime:
+                    yield row_datetime, count
+    x_dates, y_values = zip(*read_file())
+    return list(x_dates), list(y_values)               
 
 
-async def make_day_graph(target_datetime: datetime = None) -> io.BytesIO:
-        target_datetime = target_datetime or datetime.now()
-        if target_datetime.weekday() in [5, 6]:
-            start_hours = 10
-        else: start_hours = 8
-        start_datetime = datetime(target_datetime.year, target_datetime.month, target_datetime.day, hour=start_hours)
+async def make_day_graph(target_datetime: datetime = datetime.now()) -> io.BytesIO:
+        start_datetime = target_datetime.replace(hour=10 if target_datetime.isoweekday() >= 6 else 8)
         end_datetime = start_datetime + timedelta(hours=16)
+
         x_dates, y_values = await get_values_ntk_visits(start_datetime, end_datetime)
         x_dates = [f'{str(time.hour).zfill(2)}:{str(time.minute).zfill(2)}' for time in x_dates]
 
@@ -80,12 +76,11 @@ async def make_day_graph(target_datetime: datetime = None) -> io.BytesIO:
         plt.title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
         plt.xticks(rotation=45)
         
-
-        x_axis_dates = []
-        i_time = start_datetime
-        while i_time <= end_datetime:
-            x_axis_dates.append(f'{str(i_time.hour).zfill(2)}:{str(i_time.minute).zfill(2)}')
-            i_time += timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK)
+        x_axis_dates = [
+            f'{str(start_datetime.hour).zfill(2)}:{str(start_datetime.minute).zfill(2)}' +
+            timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK*i)
+            for i in range((end_datetime-start_datetime)//timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK))
+        ]
         y_zero = range(len(x_dates))
         
         plt.scatter(x_dates, y_zero, s=0, color='none')
@@ -101,7 +96,7 @@ async def make_day_graph(target_datetime: datetime = None) -> io.BytesIO:
             xytext=(x_max-1,y_max-100), 
             arrowprops=dict(facecolor='black', arrowstyle='->'),
             bbox=dict(facecolor='white', edgecolor='black', boxstyle='round')
-            )
+        )
             
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png')
