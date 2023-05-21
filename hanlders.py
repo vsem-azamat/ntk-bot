@@ -86,10 +86,18 @@ async def gen_duplex(msg: types.Message):
 
 @dp.message_handler(Command('graph', prefixes='!/'), SuperAdmins())
 async def send_stats(msg: types.Message):
+    print(1)
     image = await make_day_graph()
+<<<<<<< dev_azamat
     await msg.answer(
         chat_id=msg.from_user.id,
         photo=types.InputFile(image, filename='graph')
+=======
+    await bot.send_photo(
+        chat_id=msg.chat.id,
+        photo=types.InputFile(image),
+        caption=str(datetime.now().strftime('%d-%m-%Y'))
+>>>>>>> local
     )
     await msg.delete()
     

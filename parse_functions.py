@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 from aiogram.utils.markdown import hlink
 
+from configs import config
 from collect_time import generaet_time_list
 
 
@@ -61,7 +62,8 @@ async def get_values_ntk_visits(start_datetime: datetime, end_datetime: datetime
         return x_dates, y_values
 
 
-async def make_day_graph(target_datetime: datetime = datetime.now()) -> io.BytesIO:
+async def make_day_graph(target_datetime: datetime = None) -> io.BytesIO:
+        target_datetime = target_datetime or datetime.now()
         if target_datetime.weekday() in [5, 6]:
             start_hours = 10
         else: start_hours = 8
@@ -77,14 +79,26 @@ async def make_day_graph(target_datetime: datetime = datetime.now()) -> io.Bytes
         plt.ylabel('people')
         plt.title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
         plt.xticks(rotation=45)
-        plt.grid()
+        
+
+        x_axis_dates = []
+        i_time = start_datetime
+        while i_time <= end_datetime:
+            x_axis_dates.append(f'{str(i_time.hour).zfill(2)}:{str(i_time.minute).zfill(2)}')
+            i_time += timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK)
+        y_zero = range(len(x_dates))
+        
+        plt.scatter(x_dates, y_zero, s=0, color='none')
+        plt.xticks(x_axis_dates[::2])
+        plt.yticks(range(0,1100,100))
+        plt.grid(True, linewidth=0.5, which='both', axis='both')
 
         y_max = max(y_values)
         x_max = y_values.index(y_max)
         plt.annotate(
             text=f'Max: {y_max}', 
             xy=(x_max, y_max), 
-            xytext=(x_max-1,y_max-2), 
+            xytext=(x_max-1,y_max-100), 
             arrowprops=dict(facecolor='black', arrowstyle='->'),
             bbox=dict(facecolor='white', edgecolor='black', boxstyle='round')
             )
