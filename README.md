@@ -36,12 +36,6 @@ SUPER_ADMINS=<int,int,int,...>
 #### Anonymous emails in chat:
 To set up a bad word filter for **anonymous messages**, create a `bad_words.txt` file and write the necessary words on each new line. When a bad word is detected, the bot does not send an anonymous letter to the chat, but sends it to the bot administrator with the sender's data.
 
-```txt
-aboba
-lupa
-pupa
-```
-
 ## Commands:
 Prefixes: `!/`
 - `/ntk` - Show the current number of people in the library
