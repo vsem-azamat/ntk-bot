@@ -28,7 +28,16 @@ async def on_startup(dp):
 
     setup(dp)
     asyncio.create_task(recieve_ntk_data(config.DELTA_TIME_FOR_RECIEVE_NTK))
-        
+
+    async def scheduler():
+        target_times = [time(10, 00), time(14, 00), time(18, 00), time(22, 00)]
+        while True:
+            current_time = datetime.now().time()
+            if current_time in target_times:
+                await daily_graph(bot)
+            await asyncio.sleep(60)
+    
+    asyncio.create_task(scheduler())
 
     # # shit code
     # while True:
