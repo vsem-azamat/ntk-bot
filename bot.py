@@ -13,17 +13,9 @@ bot = Bot(token=config.BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
-async def perform_action_at_time(action, target_time):
-    while True:
-        current_time = datetime.now().time()
-        if target_time+timedelta(seconds=10) >= current_time >= target_time:
-            await action()
-            break
-        asyncio.sleep(1)
-
-
-async def send_daily_graph():
+async def daily_graph(bot: Bot):
     image = await make_day_graph()
+    print(1)
     await bot.send_photo(
         chat_id=config.SUPER_ADMINS[1],
         photo=types.InputFile(image),
@@ -36,11 +28,20 @@ async def on_startup(dp):
 
     setup(dp)
     asyncio.create_task(recieve_ntk_data(config.DELTA_TIME_FOR_RECIEVE_NTK))
+        
 
-    await perform_action_at_time(send_daily_graph, time(10,00))
-    await perform_action_at_time(send_daily_graph, time(14,00))
-    await perform_action_at_time(send_daily_graph, time(18,00))
-    await perform_action_at_time(send_daily_graph, time(22,00))
+    # shit code
+    while True:
+        current_time = datetime.now().time()
+        target_time1 = time(10,00)
+        target_time2 = time(14,00)
+        target_time3 = time(18,00)
+        target_time4 = time(22,00)
+        
+        if current_time == target_time1 or current_time == target_time2 or \
+           current_time == target_time3 or current_time == target_time4:
+            await daily_graph(bot)
+            await asyncio.sleep(1)
 
 
 if __name__ == '__main__':
