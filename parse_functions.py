@@ -2,7 +2,7 @@ import io
 import asyncio
 import requests
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional, Union
 
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
@@ -26,15 +26,15 @@ async def get_duplex_events() -> str:
     return text
 
 
-async def get_ntk_quantity() -> str:
+async def get_ntk_quantity() -> int:
     url = 'https://www.techlib.cz/en/'
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'lxml')
     body = soup.find_all('div', class_='panel-body text-center lead')
-    return body[0].text.strip()
+    return int(body[0].text.strip())
 
 
-async def recieve_ntk_data(delta_time: int = 20):
+async def recieve_ntk_data(delta_time: int = 20) -> None:
     time_list = await generaet_time_list(delta_time)
     while True:
         current_time = datetime.now().strftime("%H:%M")
@@ -54,17 +54,19 @@ async def get_values_ntk_visits(start_datetime: datetime, end_datetime: datetime
             for row in file:
                 day, time, _, count = row.split(' ')
                 row_datetime = datetime.strptime(f'{day} {time}', '%Y-%m-%d %H:%M')
-                count = int(count[:-1])
                 if start_datetime <= row_datetime <= end_datetime:
-                    yield row_datetime, count
-    x_dates, y_values = zip(*read_file())
-    return list(x_dates), list(y_values)               
+                    yield row_datetime, int(count)
+    try:
+        x_dates, y_values = zip(*read_file())
+        return x_dates, y_values
+    except ValueError:
+        return [], []
 
 
-async def make_day_graph(target_datetime: datetime = datetime.now()) -> io.BytesIO:
-        start_datetime = target_datetime.replace(hour=10 if target_datetime.isoweekday() >= 6 else 8)
-        end_datetime = start_datetime + timedelta(hours=16)
-
+async def make_day_graph(target_datetime: Optional[datetime] = None) -> io.BytesIO:
+        target_datetime = target_datetime or datetime.now()
+        start_datetime = target_datetime.replace(hour=10 if target_datetime.isoweekday() >= 6 else 8, minute=0, second=0, microsecond=0)
+        end_datetime = start_datetime + timedelta(hours=18)
         x_dates, y_values = await get_values_ntk_visits(start_datetime, end_datetime)
         x_dates = [f'{str(time.hour).zfill(2)}:{str(time.minute).zfill(2)}' for time in x_dates]
 
@@ -75,30 +77,35 @@ async def make_day_graph(target_datetime: datetime = datetime.now()) -> io.Bytes
         plt.ylabel('people')
         plt.title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
         plt.xticks(rotation=45)
-        
-        x_axis_dates = [
-            f'{str(start_datetime.hour).zfill(2)}:{str(start_datetime.minute).zfill(2)}' +
-            timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK*i)
-            for i in range((end_datetime-start_datetime)//timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK))
-        ]
-        y_zero = range(len(x_dates))
-        
-        plt.scatter(x_dates, y_zero, s=0, color='none')
-        plt.xticks(x_axis_dates[::2])
-        plt.yticks(range(0,1100,100))
         plt.grid(True, linewidth=0.5, which='both', axis='both')
+        
+        x_lables = []
+        i_datetime = start_datetime
+        while i_datetime <= end_datetime:
+            x_lables.append(f'{str(i_datetime.hour).zfill(2)}:{str(i_datetime.minute).zfill(2)}')
+            i_datetime += timedelta(minutes=config.DELTA_TIME_FOR_RECIEVE_NTK)
+        y_lables_zero = [0] * len(x_lables)
+        plt.plot(x_lables, y_lables_zero, marker='', color='none')
 
-        y_max = max(y_values)
-        x_max = y_values.index(y_max)
-        plt.annotate(
-            text=f'Max: {y_max}', 
-            xy=(x_max, y_max), 
-            xytext=(x_max-1,y_max-100), 
-            arrowprops=dict(facecolor='black', arrowstyle='->'),
-            bbox=dict(facecolor='white', edgecolor='black', boxstyle='round')
-        )
-            
+        # legend settings
+        plt.yticks(range(0,1100,100))
+        plt.gca().xaxis.set_major_locator(plt.MaxNLocator(len(x_lables[::2])))
+
+        # Annotate point of maximum \
+        if y_values:
+            y_max = max(y_values)
+            x_max = y_values.index(y_max)
+            plt.annotate(
+                text=f'Max: {y_max}', 
+                xy=(x_max, y_max), 
+                xytext=(x_max-2,y_max-100), 
+                arrowprops=dict(facecolor='black', arrowstyle='->'),
+                bbox=dict(facecolor='white', edgecolor='black', boxstyle='round')
+            )
+        
+        # fig = plt.gcf()
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png')
         buffer.seek(0)
         return buffer
+
