@@ -3,7 +3,7 @@ from aiogram import Bot, Dispatcher, types
 
 # OTHER
 import asyncio
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from parse_functions import recieve_ntk_data, make_day_graph
 from configs import config
 
@@ -30,18 +30,18 @@ async def on_startup(dp):
     asyncio.create_task(recieve_ntk_data(config.DELTA_TIME_FOR_RECIEVE_NTK))
         
 
-    # shit code
-    while True:
-        current_time = datetime.now().time()
-        target_time1 = time(10,00)
-        target_time2 = time(14,00)
-        target_time3 = time(18,00)
-        target_time4 = time(22,00)
+    # # shit code
+    # while True:
+    #     current_time = datetime.now().time()
+    #     target_time1 = time(10,00)
+    #     target_time2 = time(14,00)
+    #     target_time3 = time(18,00)
+    #     target_time4 = time(22,00)
         
-        if current_time == target_time1 or current_time == target_time2 or \
-           current_time == target_time3 or current_time == target_time4:
-            await daily_graph(bot)
-            await asyncio.sleep(1)
+    #     if current_time == target_time1 or current_time == target_time2 or \
+    #        current_time == target_time3 or current_time == target_time4:
+    #         await daily_graph(bot)
+    #         await asyncio.sleep(1)
 
 
 if __name__ == '__main__':
