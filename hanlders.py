@@ -25,8 +25,8 @@ async def ask_ntk(msg: types.Message):
     "Команды:\n"\
     "/ntk - Показать кол-во людей в NTK\n"\
     "/duplex - Duplex Events <i>(без комментариев)</i>\n"\
-    "/anon <text> -  Прислать в @chat_ntk анонимку\n"\
-    "/int - Попросить анонимно инсту.\n\n"\
+    "/анон <text> -  Прислать в @chat_ntk анонимку\n"\
+    "/inst - Попросить анонимно инсту.\n\n"\
     "admin: t.me/vsem_azamat"
 
     await msg.answer(text, disable_web_page_preview=True)
@@ -58,12 +58,11 @@ async def anon_old(msg: types.Message):
 @dp.message_handler(Command('анон', prefixes='!/'), BlackList())
 async def anon_message(msg: types.Message):    
     text_anon = msg.text[6:]
-
     if msg.chat.id == msg.from_user.id:
         if 1 < len(text_anon) < 1000:
             # filter for bad words
             for word in config.BAD_WORDS:
-                if word in text_anon:
+                if word in text_anon.lower():
                     await bot.send_message(
                             chat_id=268388996,
                             text=f"id: {msg.from_user.id} \nlogin: @{msg.from_user.username} \n\ntext:\n{text_anon}"
@@ -89,7 +88,8 @@ async def send_stats(msg: types.Message):
     image = await make_day_graph()
     await bot.send_photo(
         chat_id=msg.chat.id,
-        photo=types.InputFile(image, filename='graph')
+        photo=types.InputFile(image),
+        caption=str(datetime.now().strftime('%d-%m-%Y'))
     )
     await msg.delete()
     
