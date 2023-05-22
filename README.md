@@ -2,14 +2,14 @@
 Telegram bot in @chat_ntk chat for students who regularly visit the National Technical Library.
 
 ## Current and planned functions:
-[x] Shows the current number of people in the NTK
-[x] Regular storage of data from the library website on the number of people
-[x] Draws a diagram of people's visits in the NTK
-[x] Anonymous questions in [@chat_ntk](t.me/chat_ntk)
-[-] Predicting the number of people in the library based on the received data
-[-] Daily reports for the morning weather forecast for the whole day
-[-] Anti-bot filter
-[-] Function for temporary self muta/ban from the chat so that students are not distracted from their studies
+- [x] Shows the current number of people in the NTK
+- [x] Regular storage of data from the library website on the number of people
+- [x] Draws a diagram of people's visits in the NTK
+- [x] Anonymous questions in [@chat_ntk](t.me/chat_ntk)
+- [-] Predicting the number of people in the library based on the received data
+- [-] Daily reports for the morning weather forecast for the whole day
+- [-] Anti-bot filter
+- [-] Function for temporary self muta/ban from the chat so that students are not distracted from their studies
 
 ## Installation and start
 
