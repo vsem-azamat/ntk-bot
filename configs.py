@@ -14,10 +14,12 @@ class Config:
     ID_NTK_SMALL_CHAT: int = -1001384533622
     BLACK_LIST_OF_USERS = [2132881105, ]
     BAD_WORDS = []
-    with open('bad_words.txt', 'r') as file:
-        for line in file:
-            word = line.strip()
-            BAD_WORDS.append(word)
+    try:
+        with open('bad_words.txt', 'r') as file:
+            for line in file:
+                word = line.strip()
+                BAD_WORDS.append(word)
+    except FileNotFoundError: pass 
     try:
         DELTA_TIME_FOR_RECIEVE_NTK: int = int(os.getenv('DELTA_TIME'))
     except TypeError:
