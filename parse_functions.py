@@ -2,7 +2,7 @@ import io
 import asyncio
 import requests
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
@@ -13,16 +13,21 @@ from collect_time import generaet_time_list
 
 
 async def get_duplex_events() -> str:
-    url = 'https://www.duplex.cz/'
-    response = requests.get(url)
+    url = 'https://www.duplex.cz/all-events/'
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',  
+    }
+    response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'lxml')
-    d_list = soup.find_all('div', class_='col-sm-6 col-md-4 col-lg-3 archive-event')
-
-    text = """💃<b>Duplex events:💃</b>"""
-    for i in d_list:
-        event_title = i.find('div', class_='event_title').text
-        event_link = i.find('a', class_='event_title_link clearfix', href=True)['href']
-        text += hlink(f'\n\n🎤{event_title}', event_link)
+    events = soup.find_all('div', class_='event_details')
+    text = """💃<b>Duplex events:💃</b>\n"""
+    for event_details in events:
+        month = event_details.find('span', class_='month').text
+        day = event_details.find('span', class_='date').text
+        title = event_details.find('div', class_='event_title').text
+        link = event_details.find('a', class_='event_title_link clearfix')['href']
+        text += f'\n🪩<b>{month}-{day}:</b>' + hlink(f' {title}', link)
     return text
 
 
