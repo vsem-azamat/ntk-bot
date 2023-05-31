@@ -102,7 +102,6 @@ class PlotGraphs():
         return fig
 
 
-
 pltGraph = PlotGraphs()
 
 
@@ -112,7 +111,7 @@ async def daily_graph(bot: Bot):
     fig.savefig(image, format='png')
     image.seek(0) 
     await bot.send_photo(
-        chat_id=config.SUPER_ADMINS[1],
+        chat_id=config.ID_NTK_BIG_CHAT,
         photo=types.InputFile(image),
         caption=str(datetime.now().strftime('%d-%m-%Y'))
     )
