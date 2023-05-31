@@ -1,15 +1,19 @@
+import io
 from datetime import datetime, timedelta
 
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 
 from bot import dp, bot
-from configs import config, NtkGroup, BlackList, SuperAdmins
-from parse_functions import get_duplex_events, get_ntk_quantity, make_day_graph
+from configs import NtkGroup, SuperAdmins
+from apps.parse_functions import get_ntk_quantity
+from apps.plot_functions import pltGraph
+from apps.predictModels import predictModels
 
 
 @dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
 async def ntk(msg: types.Message):
+    """Send ntk quantity"""
     q = await get_ntk_quantity()
     text = f'📚В NTK сейчас людей: {q}'
     if int(q) >= 700:
@@ -20,76 +24,34 @@ async def ntk(msg: types.Message):
 
 @dp.message_handler(Command('help', prefixes='!/'), NtkGroup())
 async def ask_ntk(msg: types.Message):
+    """Send help message"""
     text = \
     "<b>Хай, я создан для чата @chat_ntk!</b>\n\n"\
     "Команды:\n"\
-    "/ntk - Показать кол-во людей в NTK\n"\
-    "/duplex - Duplex Events <i>(без комментариев)</i>\n"\
-    "/анон <text> -  Прислать в @chat_ntk анонимку\n"\
-    "/inst - Попросить анонимно инсту.\n\n"\
-    "admin: t.me/vsem_azamat"
-
-    await msg.answer(text, disable_web_page_preview=True)
-    await msg.delete()
-
-
-@dp.message_handler(Command('inst', prefixes='!/'), BlackList())
-async def get_me_inst(msg: types.Message):
-    if msg.reply_to_message:
-        text = "Дай инст, пожалуйста. \nМне для друга бота. \nОчень понравились :3"
-        await msg.reply_to_message.reply(text)
-    await msg.delete()
-
-
-@dp.message_handler(Command('anon', prefixes='!/'), BlackList())
-async def anon_old(msg: types.Message):
-    text = \
-        "<b>Привет! Я специально поменял команду, чтобы предупредить тебя о вынужденых нововведениях...</b>\n\n"\
-        "Теперь абсолютная анонимность отсутствует! В боте есть потенциальный список black слов, "\
-        "при обнаружении которых, бот перехватывает сообщение и шлёт его мне, а не в чат - "\
-        "и только в этом случае я смогу увидеть отправителя.\n\n"\
-        "Если в вашем сообщение отсутствуют маты (оскорбления), можете не беспокоиться!\n\n"\
-        "<b>Новая команда:</b>\n"\
-        "/анон 'тут анонимный текст'"
-
-    await msg.answer(text)
-        
-
-@dp.message_handler(Command('анон', prefixes='!/'), BlackList())
-async def anon_message(msg: types.Message):    
-    text_anon = msg.text[6:]
-    if msg.chat.id == msg.from_user.id:
-        if 1 < len(text_anon) < 1000:
-            # filter for bad words
-            for word in config.BAD_WORDS:
-                if word in text_anon.lower():
-                    await bot.send_message(
-                            chat_id=268388996,
-                            text=f"id: {msg.from_user.id} \nlogin: @{msg.from_user.username} \n\ntext:\n{text_anon}"
-                            )
-                    await msg.answer("Ты что-то написал плохое((\nЯ вынужден рассказать это админу.")
-                    return
-            text = "💌<b>Анон плс:</b>\n\n" + text_anon
-            await bot.send_message(chat_id=config.ID_NTK_BIG_CHAT, text=text)
-            await msg.reply('💌Отправлено!')
-        else: await msg.answer('Текст слишком короткий, либо наоборот слишком большой!')
-    else: await msg.delete()
-
-
-@dp.message_handler(Command('duplex', prefixes='!/'), NtkGroup())
-async def gen_duplex(msg: types.Message):
-    text = await get_duplex_events()
+    "/ntk - Показать кол-во людей в NTK\n\n"\
+    "admin: t.me/vsem_azamat\n"\
+    "GitHub: github.com/vsem-azamat/ntk_bot/"
     await msg.answer(text, disable_web_page_preview=True)
     await msg.delete()
 
 
 @dp.message_handler(Command('graph', prefixes='!/'), SuperAdmins())
 async def send_stats(msg: types.Message):
-    image = await make_day_graph()
+    """Send graph with prediction"""
+    fig_predict = await pltGraph.daily_graph_with_predictions()
+    image_buffer = io.BytesIO()
+    fig_predict.savefig(image_buffer, format='png')
+    image_buffer.seek(0)
     await bot.send_photo(
         chat_id=msg.chat.id,
-        photo=types.InputFile(image),
+        photo=types.InputFile(image_buffer),
         caption=str(datetime.now().strftime('%d-%m-%Y'))
     )
+
+
+@dp.message_handler(Command('learn', prefixes='!/'), SuperAdmins())
+async def learn_models(msg: types.Message):
+    """Learn models"""
+    await predictModels.learn_models()
+    await msg.answer('Models learned!')
     await msg.delete()
-    

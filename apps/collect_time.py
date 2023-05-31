@@ -1,8 +1,16 @@
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 
-async def generaet_time_list(delta_time: int = 20) -> List[str]:
+async def generaet_datetime_list(start_datetime: datetime, end_datetime: datetime, delta_minutes: Optional[int] = 20) -> List[datetime]:
+    time_list = []
+    while start_datetime <= end_datetime:
+        time_list.append(start_datetime)
+        start_datetime += timedelta(minutes=delta_minutes)
+    return time_list
+
+
+async def generaet_time_list(delta_minutes: int = 20) -> List[str]:
     start_time = "08:00"
     end_time = "02:00"
 
@@ -14,13 +22,9 @@ async def generaet_time_list(delta_time: int = 20) -> List[str]:
     if end < start:
         end += timedelta(days=1)
 
-    # Initialize time list
     time_list = []
-
-    # Add times to the list every delta_time minutes
     while start <= end:
         time_list.append(start.time().strftime("%H:%M"))
-        start += timedelta(minutes=delta_time)
+        start += timedelta(minutes=delta_minutes)
 
     return time_list
-

@@ -3,9 +3,11 @@ from aiogram import Bot, Dispatcher, types
 
 # OTHER
 import asyncio
-from datetime import datetime, time
-from parse_functions import recieve_ntk_data, make_day_graph
+from datetime import time
+
 from configs import config
+from apps.schedule_functions import scheduler, recieve_ntk_data
+from apps.plot_functions import daily_graph
 
 
 # Initialize bot and dispatcher
@@ -13,31 +15,17 @@ bot = Bot(token=config.BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
 
-async def daily_graph(bot: Bot):
-    image = await make_day_graph()
-    print(1)
-    await bot.send_photo(
-        chat_id=config.SUPER_ADMINS[1],
-        photo=types.InputFile(image),
-        caption=str(datetime.now().strftime('%d-%m-%Y'))
-    )
-
-
 async def on_startup(dp):
     from configs import setup
+    from apps.predictModels import predictModels
+
+    await predictModels.learn_models()
 
     setup(dp)
     asyncio.create_task(recieve_ntk_data(config.DELTA_TIME_FOR_RECIEVE_NTK))
 
-    async def scheduler():
-        target_times = [time(10, 00), time(14, 00), time(18, 00), time(22, 00)]
-        while True:
-            current_time = datetime.now().time()
-            if current_time in target_times:
-                await daily_graph(bot)
-            await asyncio.sleep(60)
-    
-    asyncio.create_task(scheduler())
+    target_times = [time(8, 10), time(12, 00), time(16, 00), time(22, 00)]
+    asyncio.create_task(scheduler(bot=bot, func=daily_graph, target_times=target_times))
 
 
 if __name__ == '__main__':
