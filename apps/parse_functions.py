@@ -26,14 +26,3 @@ async def get_values_ntk_visits(start_datetime: datetime, end_datetime: datetime
         return x_dates, y_values, list(XY)
     except ValueError:
         return [], [], []
-
-
-async def get_bad_word() -> str:
-    params = {
-        'lang': 'ru'
-        }
-    url = 'https://evilinsult.com/generate_insult.php'
-    response = requests.get(url, params=params)
-    soup = BeautifulSoup(response.text, 'lxml')
-    text = soup.find('body').text
-    return text

@@ -5,9 +5,8 @@ from aiogram import Bot, Dispatcher, types
 import asyncio
 from datetime import time
 
-from configs import config
-from apps.schedule_functions import scheduler, recieve_ntk_data
-from apps.plot_functions import daily_graph
+from config import config
+from apps.schedule_functions import scheduler, recieve_ntk_data, daily_graph
 
 
 # Initialize bot and dispatcher
@@ -16,7 +15,7 @@ dp = Dispatcher(bot)
 
 
 async def on_startup(dp):
-    from configs import setup
+    from config import setup
     from apps.predictModels import predictModels
 
     await predictModels.learn_models()

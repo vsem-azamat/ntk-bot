@@ -17,3 +17,4 @@ model_LinearRegression().pkl
 model_RandomForestRegressor().pkl
 Untitled.ipynb
 .ipynb_checkpoints/
+*.ipynb
