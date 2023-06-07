@@ -11,9 +11,10 @@ import matplotlib.pyplot as plt
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from matplotlib.figure import Figure   
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 
-from configs import config
+from config import config
 from apps.collect_time import generaet_datetime_list
 from apps.predictModels import predictModels
 
@@ -34,7 +35,7 @@ class PlotGraphs():
         return datetimes, quantities
 
 
-    async def daily_graph(self, target_day: Optional[datetime] = None) -> Tuple[Figure, datetime, datetime]:
+    async def daily_graph(self, target_day: Optional[datetime] = None) -> Tuple[Figure, Axes, datetime, datetime]:
         hours_delta = 18
         target_day = target_day or datetime.now()
         start_datetime = target_day.replace(hour=10 if target_day.isoweekday() >= 6 else 8).replace(minute=0, second=0, microsecond=0)
@@ -57,14 +58,15 @@ class PlotGraphs():
         ax.set_title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
         ax.grid(True, linewidth=0.3, which='both', axis='both')
 
+        
     
         ax.set_xlim([start_datetime-timedelta(minutes=30), end_datetime+timedelta(minutes=30)]) # type: ignore
         plt.xticks(rotation=45)
 
-        return fig, start_datetime, end_datetime
+        return fig, ax, start_datetime, end_datetime
 
 
-    async def add_daily_prediction(self, fig: Figure, start_datetime: datetime, end_datetime: datetime, model_name: Optional[str] = None) -> Tuple[Figure, datetime, datetime]:
+    async def add_daily_prediction(self, fig: Figure, ax: Axes, start_datetime: datetime, end_datetime: datetime, model_name: Optional[str] = None) -> Tuple[Figure, Axes, datetime, datetime]:
         datetime_objects =  await generaet_datetime_list(start_datetime, end_datetime, delta_minutes=10)
         x_day_of_week = [dt.weekday() for dt in datetime_objects]
         x_total_minutes = [(dt.hour * 60 + dt.minute) for dt in datetime_objects]
@@ -91,27 +93,15 @@ class PlotGraphs():
         ax.plot(datetime_objects, y, marker='+', linestyle='-', color=color, linewidth='1', markersize='3', label=str(model)[:-2], alpha=0.5)
         ax.legend()
 
-        return fig, start_datetime, end_datetime
+        return fig, ax, start_datetime, end_datetime
     
 
-    async def daily_graph_with_predictions(self, target_day: Optional[datetime] = None, model_name: Optional[str] = None) -> Figure:
+    async def daily_graph_with_predictions(self, target_day: Optional[datetime] = None) -> Tuple[Figure, Axes]:
         target_day = target_day or datetime.now()
-        fig, start_datetime, end_datetime = await self.daily_graph(target_day)
-        await self.add_daily_prediction(fig=fig, start_datetime=start_datetime, end_datetime=end_datetime, model_name=model_name)
-        await self.add_daily_prediction(fig=fig, start_datetime=start_datetime, end_datetime=end_datetime, model_name='RandomForestRegressor')
-        return fig
+        fig, ax, start_datetime, end_datetime = await self.daily_graph(target_day)
+        await self.add_daily_prediction(fig=fig, ax=ax, start_datetime=start_datetime, end_datetime=end_datetime, model_name='GradientBoostingRegressor')
+        await self.add_daily_prediction(fig=fig, ax=ax, start_datetime=start_datetime, end_datetime=end_datetime, model_name='RandomForestRegressor')
+        return fig, ax
 
 
-pltGraph = PlotGraphs()
-
-
-async def daily_graph(bot: Bot):
-    fig = await pltGraph.daily_graph_with_predictions()
-    image = io.BytesIO()
-    fig.savefig(image, format='png')
-    image.seek(0) 
-    await bot.send_photo(
-        chat_id=config.ID_NTK_BIG_CHAT,
-        photo=types.InputFile(image),
-        caption=str(datetime.now().strftime('%d-%m-%Y'))
-    )
+plotGraph = PlotGraphs()

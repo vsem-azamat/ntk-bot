@@ -1,14 +1,14 @@
 import io
-from datetime import datetime
 
 from aiogram import types
 from aiogram.dispatcher.filters import Command
 
 from bot import dp, bot
-from configs import NtkGroup, SuperAdmins
-from apps.parse_functions import get_ntk_quantity, get_bad_word
-from apps.plot_functions import pltGraph
+from config import NtkGroup, SuperAdmins
+from apps.parse_functions import get_ntk_quantity
+from apps.plot_functions import plotGraph
 from apps.predictModels import predictModels
+from apps.weather_api import weatherAPI
 
 
 @dp.message_handler(Command("ntk", prefixes='!/'), NtkGroup())
@@ -45,16 +45,33 @@ async def ask_ntk(msg: types.Message):
 
 @dp.message_handler(Command('graph', prefixes='!/'), NtkGroup())
 async def send_stats(msg: types.Message):
-    """Send graph with prediction"""
-    fig_predict = await pltGraph.daily_graph_with_predictions()
-    image_buffer = io.BytesIO()
-    fig_predict.savefig(image_buffer, format='png')
-    image_buffer.seek(0)
+    """Send graph with NTK visits prediction and weather forecast """
+    fig_visits, _ = await plotGraph.daily_graph_with_predictions()
+    
+    buffer_visits = io.BytesIO()
+    fig_visits.savefig(buffer_visits, format='png')
+    buffer_visits.seek(0)
+    
     await bot.send_photo(
-        chat_id=msg.chat.id,
-        photo=types.InputFile(image_buffer),
-        caption=str(datetime.now().strftime('%d-%m-%Y'))
-    )
+        chat_id=msg.chat.id, 
+        photo=buffer_visits
+        )
+    await msg.delete()
+
+
+@dp.message_handler(Command('weather', prefixes='!/'), SuperAdmins())
+async def send_weather(msg: types.Message):
+    """Send weather forecast"""
+    fig_weather, _, _ = await weatherAPI.plot_daily_weather_forecast()
+    
+    buffer_weather = io.BytesIO()
+    fig_weather.savefig(buffer_weather, format='png')
+    buffer_weather.seek(0)
+    
+    await bot.send_photo(
+        chat_id=msg.chat.id, 
+        photo=buffer_weather
+        )
     await msg.delete()
 
 
@@ -65,10 +82,3 @@ async def learn_models(msg: types.Message):
     await msg.answer('Models learned!')
     await msg.delete()
 
-
-@dp.message_handler(Command('badword', prefixes='!/'), NtkGroup())
-async def send_bad_word(msg: types.Message):
-    if msg.reply_to_message:
-        text = await get_bad_word()
-        await msg.reply_to_message.reply(text)
-    await msg.delete()
