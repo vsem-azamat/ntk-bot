@@ -6,15 +6,37 @@ Telegram bot in @chat_ntk chat for students who regularly visit the National Tec
 |:---:|:---:|
 | Daily graph | Daily graph with predictions |
 
+| ![Weather forecast](example_images/weather_forecast.png)|
+|:---:|
+| Weather forecast |
+
 
 ## Current and planned functions:
 - [x] Shows the current number of people in the NTK
 - [x] Regular storage of data from the library website on the number of people
 - [x] Draws a diagram of people's visits in the NTK
 - [x] Predicting the number of people in the library based on the received data with ML models
-- [ ] Daily reports for the morning weather forecast for the whole day
+- [x] Weather forecasts
 - [ ] Anti-bot filter
 - [ ] Function for temporary self muta/ban from the chat so that students are not distracted from their studies
+
+## Data sources:
+- [NTK website](https://www.techlib.cz/)
+- [Open-Meteo](https://open-meteo.com/)
+
+
+## How prediction works:
+The data of visits to the People's Technical Library is permanently stored. This data was processed and fed to models for training according to this principle:
+
+| X1 | X2 | X3 | Y |
+|:---:|:---:|:---:|:---:|
+| time | day of the week | month | number of people |
+
+`f(X1, X2, X3) = Y -> f(time, day of the week, month) = number of people`
+
+Two models are used:
+- Random Forest Regressor
+- Gradient Boosting Regressor
 
 ## Installation and start
 
@@ -27,6 +49,12 @@ Install requirements packages
 Create `.env` file and write **api token**
 ```env
 BOT_TOKEN=<TOKEN>
+```
+
+### Start:
+From the root directory of the project
+```sh
+> python3 main.py
 ```
 
 ### Optional:
@@ -42,5 +70,7 @@ SUPER_ADMINS=<int,int,int,...>
 ## Commands:
 Prefixes: `!/`
 - `/ntk` - Show the current number of people in the library
+- `/help` - Show help
 - `/graph` - Draw and send a diagram of library visits
-- `/learn` - Train (re-) regression ML models
+- `/learn` - Train (re-) regression ML models for predicting the number of people in the library
+- `/weather` - Show weather forecast
