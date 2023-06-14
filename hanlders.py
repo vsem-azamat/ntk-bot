@@ -29,7 +29,7 @@ async def ask_ntk(msg: types.Message):
     "🤖<b>Хай, я создан для чата @chat_ntk!</b>\n\n"\
     "📋<b>Команды:</b>\n"\
     "/ntk - Показать кол-во людей в NTK\n"\
-    "/graph - Показать график посещений NTK\n"\
+    "/graph - Показать график посещений NTK\n"
     keyboard = types.InlineKeyboardMarkup()
     button_chat = types.InlineKeyboardButton(text='📚NTK chat', url='https://t.me/chat_ntk')
     buttons = [
