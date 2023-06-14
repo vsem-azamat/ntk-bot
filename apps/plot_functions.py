@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from scipy.interpolate import interp1d, splrep, splev
 
 from config import config
 from apps.collect_time import generaet_datetime_list
@@ -46,7 +47,7 @@ class PlotGraphs():
         ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
         
-        ax.plot(x_times, y_quantities, marker='o', linestyle='-', color='black', linewidth='1', markersize='5', label='Real data')               
+        ax.plot(x_times, y_quantities, linestyle='-', color='black', linewidth='2.5', label='Real data')               
 
         # anntation settings        
         ax.legend(loc='upper right')
@@ -64,7 +65,7 @@ class PlotGraphs():
                 xy=(x_max, y_max),
                 xytext=(x_max, y_max*0.9),
                 bbox=dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9),
-                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.2", color='grey'),
+                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.2", color='black'),
             )
     
         ax.set_xlim([start_datetime-timedelta(minutes=30), end_datetime+timedelta(minutes=30)]) # type: ignore
@@ -74,31 +75,42 @@ class PlotGraphs():
 
 
     async def add_daily_prediction(self, fig: Figure, ax: Axes, start_datetime: datetime, end_datetime: datetime, model_name: Optional[str] = None) -> Tuple[Figure, Axes, datetime, datetime]:
-        datetime_objects =  await generaet_datetime_list(start_datetime, end_datetime, delta_minutes=10)
-        x_day_of_year = [dt.timetuple().tm_yday for dt in datetime_objects]
-        x_day_of_week = [dt.weekday() for dt in datetime_objects]
-        x_total_minutes = [(dt.hour * 60 + dt.minute) for dt in datetime_objects]
-        x_month = [dt.month for dt in datetime_objects]
+        x_datetime =  await generaet_datetime_list(start_datetime, end_datetime, delta_minutes=10)
+        
+        xPredict_day_of_year = [dt.timetuple().tm_yday for dt in x_datetime]
+        xPredict_day_of_week = [dt.weekday() for dt in x_datetime]
+        xPredict_total_minutes = [(dt.hour * 60 + dt.minute) for dt in x_datetime]
+        xPredict_months = [dt.month for dt in x_datetime]
 
         match model_name:
             case 'GradientBoostingRegressor':
                 model = joblib.load('model_GradientBoostingRegressor().pkl')
                 color = 'red'
+                
             case 'RandomForestRegressor':
                 model = joblib.load('model_RandomForestRegressor().pkl')
-                color = 'blue'
+                color = 'darkgreen'
             case 'LinearRegression':
                 model = joblib.load('model_LinearRegression().pkl')
-                color = 'green'
+                color = 'blue'
             case _:
+                model_name = 'GradientBoostingRegressor'
                 model = joblib.load('model_GradientBoostingRegressor().pkl')
                 color = 'red'
 
-        x = np.column_stack((x_day_of_year, x_day_of_week, x_total_minutes, x_month))
-        y = list(map(int, model.predict(x)))
+        xPredict = np.column_stack((xPredict_day_of_year, xPredict_day_of_week, xPredict_total_minutes, xPredict_months))
+        y = list(map(int, model.predict(xPredict)))
         ax = fig.axes[0]
-
-        ax.plot(datetime_objects, y, marker='+', linestyle='-', color=color, linewidth='1', markersize='3', label=str(model)[:-2], alpha=0.5)
+        
+        # Interpolate data for smooth line        
+        x_numeric = np.array([dt.timestamp() for dt in x_datetime])
+        x_interp_numeric = np.linspace(min(x_numeric), max(x_numeric), num=100)
+        x_interp_datetime = [datetime.fromtimestamp(ts) for ts in x_interp_numeric]
+        
+        tck = splrep(x_numeric, y)
+        y_interp = splev(x_interp_numeric, tck)
+        
+        ax.plot(x_interp_datetime, y_interp, linestyle='-', color=color, linewidth='1', label=model_name, zorder=0, alpha=0.5)
         ax.legend()
 
         return fig, ax, start_datetime, end_datetime
@@ -113,3 +125,4 @@ class PlotGraphs():
 
 
 plotGraph = PlotGraphs()
+
