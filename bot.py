@@ -2,6 +2,7 @@
 from aiogram import Bot, Dispatcher, types
 
 # OTHER
+import logging
 import asyncio
 from datetime import time
 
@@ -13,10 +14,23 @@ from apps.schedule_functions import scheduler, recieve_ntk_data, daily_graph
 bot = Bot(token=config.BOT_TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot)
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Logging to file
+file_handler = logging.FileHandler('logs.log')
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
+# Add file handler to logging
+logging.getLogger().addHandler(file_handler)
 
 async def on_startup(dp):
     from config import setup
     from apps.predictModels import predictModels
+
+    logging.info("Starting...")
 
     await predictModels.learn_models()
 
