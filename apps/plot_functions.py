@@ -1,8 +1,5 @@
-import io
 from typing import Optional, List, Tuple
 from datetime import datetime, timedelta
-
-from aiogram import Bot, types
 
 import joblib
 import numpy as np
@@ -58,7 +55,17 @@ class PlotGraphs():
         ax.set_title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
         ax.grid(True, linewidth=0.3, which='both', axis='both')
 
-        
+        # Add annotation for max value
+        if y_quantities:
+            y_max = max(y_quantities)
+            x_max = x_times[y_quantities.index(y_max)]
+            ax.annotate(
+                f"Max: {max(y_quantities)}",
+                xy=(x_max, y_max),
+                xytext=(x_max, y_max*0.9),
+                bbox=dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9),
+                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.2", color='grey'),
+            )
     
         ax.set_xlim([start_datetime-timedelta(minutes=30), end_datetime+timedelta(minutes=30)]) # type: ignore
         plt.xticks(rotation=45)
@@ -68,6 +75,7 @@ class PlotGraphs():
 
     async def add_daily_prediction(self, fig: Figure, ax: Axes, start_datetime: datetime, end_datetime: datetime, model_name: Optional[str] = None) -> Tuple[Figure, Axes, datetime, datetime]:
         datetime_objects =  await generaet_datetime_list(start_datetime, end_datetime, delta_minutes=10)
+        x_day_of_year = [dt.timetuple().tm_yday for dt in datetime_objects]
         x_day_of_week = [dt.weekday() for dt in datetime_objects]
         x_total_minutes = [(dt.hour * 60 + dt.minute) for dt in datetime_objects]
         x_month = [dt.month for dt in datetime_objects]
@@ -86,7 +94,7 @@ class PlotGraphs():
                 model = joblib.load('model_GradientBoostingRegressor().pkl')
                 color = 'red'
 
-        x = np.column_stack((x_day_of_week, x_total_minutes, x_month))
+        x = np.column_stack((x_day_of_year, x_day_of_week, x_total_minutes, x_month))
         y = list(map(int, model.predict(x)))
         ax = fig.axes[0]
 

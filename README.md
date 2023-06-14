@@ -28,11 +28,11 @@ Telegram bot in @chat_ntk chat for students who regularly visit the National Tec
 ## How prediction works:
 The data of visits to the People's Technical Library is permanently stored. This data was processed and fed to models for training according to this principle:
 
-| X1 | X2 | X3 | Y |
-|:---:|:---:|:---:|:---:|
-| time | day of the week | month | number of people |
+| X1 | X2 | X3 | X4 | Y |
+|:---:|:---:|:---:|:---:| :---:|
+| day of the year | day of the week | time | month | number of people |
 
-`f(X1, X2, X3) = Y -> f(time, day of the week, month) = number of people`
+`f(X1, X2, X3, X4) = Y -> f(day of the year, day of the week, time, month) = number of people`
 
 Two models are used:
 - Random Forest Regressor
