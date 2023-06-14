@@ -83,20 +83,23 @@ class WeatherAPI:
         
         for ax1.ax in [ax1, ax1_2]:
             ax1.ax.label_outer()
-            
+        
         data = await self.get_weather_forecast(1)
         hourly = data['hourly']
         datetimes = [datetime.strptime(time, '%Y-%m-%dT%H:%M') for time in hourly['time']]
-        start_datetime = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
+        start_datetime = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)-timedelta(minutes=30)
         end_datetime = start_datetime + timedelta(hours=16)
         
         # Setting the 1 axes
         ax1.xaxis.set_major_locator(mdates.HourLocator(interval=1))
         ax1.tick_params(axis='x', rotation=45)
         ax1.grid(True, linewidth=0.3, which='both', axis='both')
-        ax1.set_xlim([start_datetime-timedelta(hours=1), end_datetime]) # type: ignore
+        ax1.set_xlim([start_datetime, end_datetime]) # type: ignore
         ax1.set_ylabel('Temperature [ °C ]')   
         
+        ax1_2.set_ylim(0, 20)
+        
+        ax2.set_xlim([start_datetime, end_datetime]) # type: ignore
         ax1_2.set_ylabel('Windspeed [ m/s ]')
         
         # Setting the 2 axes
@@ -125,26 +128,41 @@ class WeatherAPI:
         x_datetimes_showers, y_showers = await self.__slice_zero_values(x_datetimes, y_showers)
         x_datetimes_snowfall, y_snowfall = await self.__slice_zero_values(x_datetimes, y_snowfall)
 
-        # Plot the data
-        ax1.plot(x_datetimes, y_temperature_2m, linestyle='-', color='gold', linewidth='0.5', label='Temperature [ °C ]')
-        ax1_2.plot(x_datetimes, y_windspeed_10m, linestyle='-', color='aqua', linewidth='0.5', label='Windspeed [ m/s ]')
-        self.set_custom_marker(ax1, x_datetimes, y_temperature_2m, 'sun')
+        # PLOT THE DATA
+        # First diagram
+        ax1.bar(x_datetimes, y_temperature_2m, color='gold', width=0.03, label='Temperature [ °C ]')
+        for x, y in zip(x_datetimes, y_temperature_2m):
+            ax1.text(x, y, y, ha='center', va='bottom', fontsize=8)        
+        ax1_2.plot(x_datetimes, y_windspeed_10m, linestyle='-', color='aqua', linewidth='1', label='Windspeed [ m/s ]')
+
+        self.set_custom_marker(ax1, x_datetimes, [y*0.98 for y in y_temperature_2m], 'sun')
         self.set_custom_marker(ax1_2, x_datetimes, y_windspeed_10m, 'wind')
+            
+        # Second diagram
+        if x_datetimes_rain:
+            ax2.stackplot(x_datetimes, y_precipitation_probability, color='cyan', alpha=0.5, labels=['Rain [ mm ]'])
+            self.set_custom_marker(ax2, x_datetimes_rain, y_rain, 'rain')
         
-        ax2.plot(x_datetimes_rain, y_rain, linestyle='-', color='deepskyblue', label='Rain [ mm ]')
-        ax2.plot(x_datetimes_showers, y_showers, label='Showers [ mm ]')
-        ax2.plot(x_datetimes_snowfall, y_snowfall, linestyle='-', color='black',  label='Snowfall [ mm ]')
+        if x_datetimes_showers:
+            ax2.stackplot(x_datetimes_showers, y_showers, color='deepskyblue', alpha=0.5, labels=['Showers [ mm ]'])
+        
+        if x_datetimes_snowfall:
+            ax2.stackplot(x_datetimes_snowfall, y_snowfall, color='white', alpha=0.5, labels=['Snowfall [ mm ]'])
+            self.set_custom_marker(ax2_2, x_datetimes_snowfall, y_snowfall, 'snowfall')
+
         ax2_2.plot(x_datetimes, y_precipitation_probability, marker='+', linestyle='-', color='gray', linewidth='1', markersize='5', label='Precipitation probability [ % ]')
-        self.set_custom_marker(ax2_2, x_datetimes_rain, y_rain, 'rain')
-        self.set_custom_marker(ax2_2, x_datetimes_snowfall, y_snowfall, 'snowfall')
+    
         
         # Set the title and legend
         ax1.set_title(f"Weather for NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
         ax1.legend(loc='upper left')
+        ax1.set_ylim(min(y_temperature_2m), max(y_temperature_2m)+2)
         ax1_2.legend(loc='upper right')
+        ax1_2.axvline(x=datetime.now(), color='black', linestyle='--', linewidth='0.7', alpha=0.5)
         
         ax2.legend(loc='upper left')
         ax2_2.legend(loc='upper right')
+        ax2_2.axvline(x=datetime.now(), color='black', linestyle='--', linewidth='0.7', alpha=0.5)
         
         return fig, ax1, ax2
     
