@@ -137,10 +137,10 @@ class WeatherAPI:
 
         self.set_custom_marker(ax1, x_datetimes, [y*0.98 for y in y_temperature_2m], 'sun')
         self.set_custom_marker(ax1_2, x_datetimes, y_windspeed_10m, 'wind')
-            
+        
         # Second diagram
-        if x_datetimes_rain:
-            ax2.stackplot(x_datetimes, y_precipitation_probability, color='cyan', alpha=0.5, labels=['Rain [ mm ]'])
+        if len(x_datetimes_rain) > 0:
+            ax2.stackplot(x_datetimes_rain, y_rain, color='cyan', alpha=0.5, labels=['Rain [ mm ]'])
             self.set_custom_marker(ax2, x_datetimes_rain, y_rain, 'rain')
         
         if x_datetimes_showers:
