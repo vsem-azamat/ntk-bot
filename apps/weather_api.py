@@ -1,6 +1,6 @@
 import requests
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -66,17 +66,29 @@ class WeatherAPI:
         return await self.__get_weather_data(params=params)
     
     
-    async def __slice_zero_values(self, x: list, y: list) -> Tuple[list, list]:
+    async def __slice_zero_values(self, x: List, y: List, leave_extreme_zeros: bool = True) -> Tuple[List, List]:
         zero_indices = np.where(np.array(y) != 0)[0]
+        
+        if leave_extreme_zeros:
+            if len(zero_indices) > 0:
+                first_nonzero_index = zero_indices[0]
+                last_nonzero_index = zero_indices[-1]
+                
+                if first_nonzero_index > 0:
+                    zero_indices = np.concatenate(([first_nonzero_index - 1], zero_indices))
+                if last_nonzero_index < len(y) - 1:
+                    zero_indices = np.concatenate((zero_indices, [last_nonzero_index + 1]))
+        
         return np.array(x)[zero_indices], np.array(y)[zero_indices]
     
-    async def __slice_time_interval(self, x: list, y: list, start_datetime: datetime, end_datetime: datetime) -> Tuple[list, list]:
+    
+    async def __slice_time_interval(self, x: List[datetime], y: List, start_datetime: datetime, end_datetime: datetime) -> Tuple[List[datetime], List]:
         indices = np.where(np.logical_and(start_datetime <= np.array(x), np.array(x) <= end_datetime))[0]
         return np.array(x)[indices], np.array(y)[indices]
-    
+
 
     async def plot_daily_weather_forecast(self) -> Tuple[Figure, Axes, Axes]:
-        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(10, 10))
+        fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(10, 8))
         fig.subplots_adjust(hspace=0.05, left=0.1, right=0.9, top=0.95, bottom=0.1)
         ax1_2 = ax1.twinx()
         ax2_2 = ax2.twinx()
@@ -124,9 +136,9 @@ class WeatherAPI:
         _, y_snowfall = await self.__slice_time_interval(datetimes, hourly['snowfall'], start_datetime, end_datetime)
         
         # Slice arrays from zero values
-        x_datetimes_rain, y_rain = await self.__slice_zero_values(x_datetimes, y_rain)
-        x_datetimes_showers, y_showers = await self.__slice_zero_values(x_datetimes, y_showers)
-        x_datetimes_snowfall, y_snowfall = await self.__slice_zero_values(x_datetimes, y_snowfall)
+        x_datetimes_rain, y_rain = await self.__slice_zero_values(x_datetimes, y_rain, leave_extreme_zeros=True)
+        x_datetimes_showers, y_showers = await self.__slice_zero_values(x_datetimes, y_showers, leave_extreme_zeros=True)
+        x_datetimes_snowfall, y_snowfall = await self.__slice_zero_values(x_datetimes, y_snowfall, leave_extreme_zeros=True)
 
         # PLOT THE DATA
         # First diagram
@@ -143,10 +155,11 @@ class WeatherAPI:
             ax2.stackplot(x_datetimes_rain, y_rain, color='cyan', alpha=0.5, labels=['Rain [ mm ]'])
             self.set_custom_marker(ax2, x_datetimes_rain, y_rain, 'rain')
         
-        if x_datetimes_showers:
-            ax2.stackplot(x_datetimes_showers, y_showers, color='deepskyblue', alpha=0.5, labels=['Showers [ mm ]'])
+        if len(x_datetimes_showers) > 0:
+            ax2.stackplot(x_datetimes_showers, y_showers, color='dodgerblue', alpha=0.5, labels=['Showers [ mm ]'])
+            self.set_custom_marker(ax2, x_datetimes_showers, y_showers, 'rain')
         
-        if x_datetimes_snowfall:
+        if len(x_datetimes_snowfall) > 0:
             ax2.stackplot(x_datetimes_snowfall, y_snowfall, color='white', alpha=0.5, labels=['Snowfall [ mm ]'])
             self.set_custom_marker(ax2_2, x_datetimes_snowfall, y_snowfall, 'snowfall')
 
@@ -163,6 +176,9 @@ class WeatherAPI:
         ax2.legend(loc='upper left')
         ax2_2.legend(loc='upper right')
         ax2_2.axvline(x=datetime.now(), color='black', linestyle='--', linewidth='0.7', alpha=0.5)
+        
+        
+        
         
         return fig, ax1, ax2
     
