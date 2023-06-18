@@ -30,10 +30,13 @@ async def recieve_ntk_data(delta_minutes: int = 20) -> None:
     while True:
         current_time = datetime.now().strftime("%H:%M")
         if current_time in time_list:
-            with open('ntk_data.txt', 'a') as file:
-                date = datetime.now().strftime("%Y-%m-%d")
-                quantity_ntk = await get_ntk_quantity()
-                file.write(f"{date} {current_time} - {quantity_ntk}\n")
+            try:
+                with open('ntk_data.txt', 'a') as file:
+                    date = datetime.now().strftime("%Y-%m-%d")
+                    quantity_ntk = await get_ntk_quantity()
+                    file.write(f"{date} {current_time} - {quantity_ntk}\n")
+            except  Exception as e:
+                print(e)
             await asyncio.sleep(delta_minutes*60-60)
         else:
             await asyncio.sleep(1)
