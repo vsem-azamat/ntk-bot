@@ -55,18 +55,19 @@ async def daily_graph(bot: Bot) -> None:
     buffer_weather = io.BytesIO()
     fig_weather.savefig(buffer_weather, format='png')
     buffer_weather.seek(0)
-    
+
     media_group = [
         types.InputMediaPhoto(buffer_visits), 
         types.InputMediaPhoto(buffer_weather)
         ]
     
     await bot.send_media_group(
-        chat_id=config.ID_NTK_BIG_CHAT,
+        chat_id=config.ID_NTK_CHANNEL,
         media=types.MediaGroup(media_group),
         disable_notification=True
         )
     await bot.send_message(
-        chat_id=config.ID_NTK_BIG_CHAT,
-        text=f"📊График посещаемости и прогноз погоды:\n {datetime.now().strftime('%A')} {datetime.now().strftime('%d-%m-%Y')}"
+        chat_id=config.ID_NTK_CHANNEL,
+        text=f"📊График посещаемости и прогноз погоды:\n {datetime.now().strftime('%A')} {datetime.now().strftime('%d-%m-%Y')}",
+        disable_notification=True
         )

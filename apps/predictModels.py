@@ -1,19 +1,17 @@
-from datetime import datetime
-
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error 
 import joblib
+import numpy as np
+from datetime import datetime
+from typing import List, Union, TypeAlias, Tuple, Any
+
+from sklearn.metrics import mean_squared_error 
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
 
-from typing import Optional, List
-# import pandas as pd
-
+ModelsML: TypeAlias = Union[RandomForestRegressor, GradientBoostingRegressor]
 
 class PredictModels:
-    async def perform_regression(self, data: List[str], MLmodel):  
+    async def perform_regression(self, data: List[str], modelML: ModelsML) -> Tuple[ModelsML, Union[Any, float, np.ndarray]]:  
         data = await self.remove_zero_values(data)  
         datetime_objects = [datetime.strptime(row.split(' - ')[0], "%Y-%m-%d %H:%M") for row in data]
 
@@ -27,14 +25,14 @@ class PredictModels:
 
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
 
-        model = MLmodel()
-        model.fit(X_train, Y_train)
-        joblib.dump(model, f'model_{model}.pkl')
+        
+        modelML.fit(X_train, Y_train)
+        joblib.dump(modelML, f'model_{modelML}.pkl')
 
-        y_pred = model.predict(X_test)
+        y_pred = modelML.predict(X_test)
         mse = mean_squared_error(Y_test, y_pred)
         
-        return model, mse
+        return modelML, mse
 
 
     async def remove_zero_values(self, data: List[str]) -> List[str]:
@@ -53,12 +51,16 @@ class PredictModels:
         with open('ntk_data.txt', 'r') as file:
             for row in file:
                 data.append(row.strip())
-        await self.perform_regression(data, LinearRegression)
-        await self.perform_regression(data, RandomForestRegressor)
-        await self.perform_regression(data, GradientBoostingRegressor)
+        if len(data) > 10:
+            rf_regressor = RandomForestRegressor()
+            await self.perform_regression(data, rf_regressor)
+
+            gb_regressor = GradientBoostingRegressor()
+            await self.perform_regression(data, gb_regressor)
+
 
    
-    async def predict(self, model, new_data) -> List[int]:
+    async def predict(self, model: ModelsML, new_data: List[str]) -> List[int]:
         datetime_objects = [datetime.strptime(row.split(' - ')[0], "%Y-%m-%d %H:%M") for row in new_data]
 
         X_day_of_year = [dt.timetuple().tm_yday for dt in datetime_objects]

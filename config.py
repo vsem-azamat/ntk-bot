@@ -1,5 +1,6 @@
 import os
 from dotenv import main
+from typing import List
 
 from aiogram.dispatcher.filters import BoundFilter
 from aiogram import types, Dispatcher
@@ -10,8 +11,11 @@ class Config:
     main.load_dotenv()
     
     BOT_TOKEN: str = str(os.getenv('BOT_TOKEN'))
+    
     ID_NTK_BIG_CHAT: int = -1001684546093
     ID_NTK_SMALL_CHAT: int = -1001384533622
+    ID_NTK_CHANNEL: int = -1001918057675
+
     BLACK_LIST_OF_USERS = [2132881105, ]
     BAD_WORDS = []
     try:
@@ -21,15 +25,16 @@ class Config:
                 BAD_WORDS.append(word)
     except FileNotFoundError: pass 
     try:
-        DELTA_TIME_FOR_RECIEVE_NTK: int = int(os.getenv('DELTA_TIME'))
+        DELTA_TIME_FOR_RECIEVE_NTK: int = int(os.getenv('DELTA_TIME')) # minutes
     except TypeError:
         DELTA_TIME_FOR_RECIEVE_NTK: int = 20
 
     try:
-        SUPER_ADMINS: int = [int(id_admin) for id_admin in os.getenv('SUPER_ADMINS').split(',')]
-    except TypeError:
-        SUPER_ADMINS: list[int] = []
+        SUPER_ADMINS: List[int] = [int(id_admin) for id_admin in os.getenv('SUPER_ADMINS').split(',')]
+    except TypeError or AttributeError:
+        SUPER_ADMINS: List[int] = []
     
+
 
 config = Config()
 

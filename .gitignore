@@ -1,0 +1,8 @@
+.env
+.vscode/
+*__pycache__/
+*.py[cod]
+logs/
+*.log
+ntk_data.txt
+venv/
