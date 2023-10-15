@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
-from scipy.interpolate import interp1d, splrep, splev
+from scipy.interpolate import splrep, splev
 
 from config import config
 from apps.collect_time import generaet_datetime_list

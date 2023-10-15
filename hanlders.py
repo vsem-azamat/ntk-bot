@@ -64,7 +64,7 @@ async def ask_ntk(msg: types.Message):
     await message.delete()
 
 
-@dp.message_handler(Command('graph', prefixes='!/'), SuperAdmins())
+@dp.message_handler(Command('graph', prefixes='!/'), NtkGroup())
 async def send_stats(msg: types.Message):
     """Send graph with NTK visits prediction and weather forecast """
     fig_visits, _ = await plotGraph.daily_graph_with_predictions()
@@ -102,3 +102,9 @@ async def learn_models(msg: types.Message):
     await predictModels.learn_models()
     await msg.answer('Models learned!')
     await msg.delete()
+
+
+@dp.message_handler(Command('data', prefixes='!/'), SuperAdmins())
+async def send_data(msg: types.Message):
+    with open('ntk_data.txt', 'rb') as file:
+        await bot.send_document(msg.chat.id, file)
