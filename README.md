@@ -2,13 +2,9 @@
 Telegram bot in @chat_ntk chat for students who regularly visit the National Technical Library. The bot regularly collects statistics on library visits. Based on this data, simple machine learning models were created for regression of visits.
 
 
-| ![Daily graph](example_images/daily_graph.png) | ![Daily graph with predictions](example_images/daily_graph_with_predictions.png) |
+| ![Daily graph with predictions](example_images/daily_graph_with_predictions.jpg) | ![Weather forecast](example_images/weather_forecast.jpg) |
 |:---:|:---:|
-| Daily graph | Daily graph with predictions |
-
-| ![Weather forecast](example_images/weather_forecast.png)|
-|:---:|
-| Weather forecast |
+| Daily graph with predictions | Weather forecast |
 
 
 ## Current and planned functions:
