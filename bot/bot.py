@@ -2,7 +2,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 
 from config import cnfg
-from bot.hanlders import router
+from bot.handlers import router
 from apps.schedule_functions import recieve_ntk_data
 
 
