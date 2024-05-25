@@ -1,8 +1,9 @@
 import requests
 from datetime import datetime
 from typing import Tuple, Generator
-
 from bs4 import BeautifulSoup
+
+from config import cnfg
 
 
 async def get_ntk_quantity() -> int:
@@ -15,7 +16,7 @@ async def get_ntk_quantity() -> int:
 
 async def get_values_ntk_visits(start_datetime: datetime, end_datetime: datetime):
     def read_file() -> Generator[Tuple[datetime, int, str], None, None]:
-        with open('ntk_data.txt', 'r') as file:
+        with open(cnfg.NTK_DATA_PATH, 'r') as file:
             for row in file:
                 day, time, _, count = row.split(' ')
                 row_datetime = datetime.strptime(f'{day} {time}', '%Y-%m-%d %H:%M')
