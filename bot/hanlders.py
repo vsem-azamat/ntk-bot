@@ -5,6 +5,7 @@ from aiogram.filters import Command
 from aiogram import Bot, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from config import cnfg
 from bot.filters import NTKChatFilter, SuperAdmins
 from apps.parse_functions import get_ntk_quantity
 from apps.plot_functions import plotGraph
@@ -17,15 +18,15 @@ router = Router()
 
 
 @router.message(Command('anon'))
-async def anon(message: types.Message):
+async def anon(message: types.Message, bot: Bot):
     """Send anon message"""
     text_head = "<b>💌Анон плс:</b>\n\n"
     text = message.text
     if message.chat.id == message.from_user.id and text:
-        text = text[:6].strip()
-        await message.answer(
-            text_head + text,
-            disable_notification=True,
+        text = text[6:].strip()
+        await bot.send_message(
+            chat_id=cnfg.ID_NTK_BIG_CHAT,
+            text=text_head + text,
             parse_mode='HTML'
             )
     else:
