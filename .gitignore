@@ -6,3 +6,4 @@ logs/
 *.log
 ntk_data.txt
 venv/
+.instructions

@@ -27,10 +27,15 @@ class Config:
         with open(NTK_DATA_PATH, 'w'): 
             pass
 
-
     # >>>>>>>>>> PARSERS <<<<<<<<<< #
     DELTA_TIME_FOR_RECIEVE_NTK: int = config('DELTA_TIME', cast=int, default=20)
-    
+
+    # >>>>>>>>>> OPENAI <<<<<<<<<< #
+    OPENAI_API_KEY: str = str(config('OPENAI_API_KEY', cast=str))
+    instructions_path = ".instructions"
+    assert os.path.exists(instructions_path), f"Instrucions file not found: {instructions_path}"
+    with open(instructions_path, 'r') as file:
+        INSTRUCTIONS = file.read()
 
 cnfg = Config()
 

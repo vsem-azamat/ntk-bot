@@ -1,4 +1,5 @@
 import io
+import random
 
 from aiogram.filters import Command
 from aiogram import Bot, Router, types
@@ -9,6 +10,7 @@ from apps.parse_functions import get_ntk_quantity
 from apps.plot_functions import plotGraph
 from apps.predictModels import predictModels
 from apps.weather_api import weatherAPI
+from apps.gpt import get_gpt_response
 
 
 router = Router()
@@ -118,3 +120,13 @@ async def send_data(msg: types.Message, bot: Bot):
             filename='ntk_data.txt'
             )
         await bot.send_document(msg.chat.id, input_file)
+
+
+@router.message(NTKChatFilter())
+async def gpt_bullying(message: types.Message):
+    """Random GPT response"""
+    text = message.text
+    if text and random.random() < 0.0001:
+        response = await get_gpt_response(text)
+        if response:
+            await message.answer(str(response))
