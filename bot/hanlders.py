@@ -17,11 +17,12 @@ router = Router()
 
 
 @router.message(Command('anon'))
-async def anon(message: types.Message, command: types.BotCommand):
+async def anon(message: types.Message):
     """Send anon message"""
     text_head = "<b>💌Анон плс:</b>\n\n"
-    text = command.command.strip()
+    text = message.text
     if message.chat.id == message.from_user.id and text:
+        text = text[:6].strip()
         await message.answer(
             text_head + text,
             disable_notification=True,
@@ -47,6 +48,7 @@ async def ntk(message: types.Message):
 
 @router.message(Command('help'))
 async def help(message: types.Message):
+    print(message)
     """Send help message"""
     text = \
     "🤖<b>Хай, я создан для чата @chat_ntk!</b>\n\n"\
