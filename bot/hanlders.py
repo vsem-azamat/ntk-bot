@@ -21,9 +21,8 @@ router = Router()
 async def anon(message: types.Message, bot: Bot):
     """Send anon message"""
     text_head = "<b>💌Анон плс:</b>\n\n"
-    text = message.text
+    text = message.text[:6].strip()
     if message.chat.id == message.from_user.id and text:
-        text = text[6:].strip()
         await bot.send_message(
             chat_id=cnfg.ID_NTK_BIG_CHAT,
             text=text_head + text,
