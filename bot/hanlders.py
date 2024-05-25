@@ -131,7 +131,7 @@ async def send_data(msg: types.Message, bot: Bot):
 async def gpt_bullying(message: types.Message):
     """Random GPT response"""
     text = message.text
-    if text and random.random() < 0.00015:
+    if text and random.random() < 0.025:
         response = await get_gpt_response(text)
         if response:
             await message.reply(str(response))
