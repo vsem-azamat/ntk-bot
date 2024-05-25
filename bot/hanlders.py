@@ -48,7 +48,6 @@ async def ntk(message: types.Message):
 
 @router.message(Command('help'))
 async def help(message: types.Message):
-    print(message)
     """Send help message"""
     text = \
     "🤖<b>Хай, я создан для чата @chat_ntk!</b>\n\n"\
