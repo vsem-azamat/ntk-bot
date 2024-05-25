@@ -23,11 +23,16 @@ async def anon(message: types.Message, bot: Bot):
     text_head = "<b>💌Анон плс:</b>\n\n"
     text = message.text[6:].strip()
     if message.chat.id == message.from_user.id and text:
-        await bot.send_message(
+        member = await bot.get_chat_member(
             chat_id=cnfg.ID_NTK_BIG_CHAT,
-            text=text_head + text,
-            parse_mode='HTML'
+            user_id=message.from_user.id
             )
+        if member.status in ['creator', 'administrator', 'member']:
+            await bot.send_message(
+                chat_id=cnfg.ID_NTK_BIG_CHAT,
+                text=text_head + text,
+                parse_mode='HTML'
+                )
     else:
         await message.delete()
 
