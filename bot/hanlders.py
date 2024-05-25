@@ -134,4 +134,4 @@ async def gpt_bullying(message: types.Message):
     if text and random.random() < 0.00015:
         response = await get_gpt_response(text)
         if response:
-            await message.answer(str(response))
+            await message.reply(str(response))
