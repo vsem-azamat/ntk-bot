@@ -38,7 +38,10 @@ async def ntk(message: types.Message):
     text = f"📚<b>В NTK сейчас людей:</b> {q}"
     text += '\nДохуя крч.' if q >= 700 else ''
     text += "\n\n📣<a href='t.me/ntk_info'><b>NTK info</b></a>"
-    await message.answer(text)
+    await message.answer(
+        text=text,
+        parse_mode='HTML', 
+        )
     await message.delete()
 
 
@@ -126,7 +129,7 @@ async def send_data(msg: types.Message, bot: Bot):
 async def gpt_bullying(message: types.Message):
     """Random GPT response"""
     text = message.text
-    if text and random.random() < 0.0001:
+    if text and random.random() < 0.00015:
         response = await get_gpt_response(text)
         if response:
             await message.answer(str(response))
