@@ -11,16 +11,6 @@ from bot.filters import NTKChatFilter, SuperAdmins
 router = Router()
 
 
-@router.message(NTKChatFilter())
-async def gpt_bullying(message: types.Message):
-    """Random GPT response"""
-    text = message.text
-    if text and random.random() < cnfg.GPT_ANSWER_PROBABILITY:
-        response = await get_gpt_response(text)
-        if response:
-            await message.reply(str(response))
-
-
 @router.message(Command('gpt'), SuperAdmins())
 async def change_gpt_answer_probability(message: types.Message):
     """Change GPT answer probability"""
@@ -74,3 +64,12 @@ async def set_gpt_answer_probability(callback_query: types.CallbackQuery, bot: B
         reply_markup=None
     )
 
+# IMPORTANT: This handler should be the last in the file
+@router.message(NTKChatFilter())
+async def gpt_bullying(message: types.Message):
+    """Random GPT response"""
+    text = message.text
+    if text and random.random() < cnfg.GPT_ANSWER_PROBABILITY:
+        response = await get_gpt_response(text)
+        if response:
+            await message.reply(str(response))
