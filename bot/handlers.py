@@ -1,25 +1,45 @@
 import io
 import random
 
-from aiogram.filters import Command
 from aiogram import Bot, Router, types
+from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from config import cnfg
-from bot.filters import NTKChatFilter, SuperAdmins
+from apps.gpt import get_gpt_response
 from apps.parse_functions import get_ntk_quantity
 from apps.plot_functions import plotGraph
 from apps.predictModels import predictModels
 from apps.weather_api import weatherAPI
-from apps.gpt import get_gpt_response
-
+from bot.filters import NTKChatFilter, SuperAdmins
+from config import cnfg
 
 router = Router()
+
+
+@router.message(Command('anon_enable'), SuperAdmins())
+async def anon_enable(message: types.Message):
+    """Enable anon functionality"""
+    cnfg.ANON_ENABLED = True
+    await message.answer("🤖<b>Анон включен</b>\n")
+    await message.delete()
+
+
+@router.message(Command('anon_disable'), SuperAdmins())
+async def anon_disable(message: types.Message):
+    """Disable anon functionality"""
+    cnfg.ANON_ENABLED = False
+    await message.answer("🤖<b>Анон выключен</b>\n")
+    await message.delete()
 
 
 @router.message(Command('anon'))
 async def anon(message: types.Message, bot: Bot):
     """Send anon message"""
+    if not cnfg.ANON_ENABLED:
+        await message.reply("💤<b>Анончик сейчас спит</b>💤")
+        await message.delete()
+        return
+
     text_head = "<b>💌Анон плс:</b>\n\n"
     text = message.text[6:].strip()
     if message.chat.id == message.from_user.id and text:
@@ -46,8 +66,8 @@ async def ntk(message: types.Message):
     text += "\n\n📣<a href='t.me/ntk_info'><b>NTK info</b></a>"
     await message.answer(
         text=text,
-        parse_mode='HTML', 
-        )
+        parse_mode='HTML',
+    )
     await message.delete()
 
 
@@ -55,10 +75,10 @@ async def ntk(message: types.Message):
 async def help(message: types.Message):
     """Send help message"""
     text = \
-    "🤖<b>Хай, я создан для чата @chat_ntk!</b>\n\n"\
-    "📋<b>Команды:</b>\n"\
-    "/ntk - Показать кол-во людей в NTK\n"\
-    "/graph - Показать график посещений NTK\n"
+        "🤖<b>Хай, я создан для чата @chat_ntk!</b>\n\n" \
+        "📋<b>Команды:</b>\n" \
+        "/ntk - Показать кол-во людей в NTK\n" \
+        "/graph - Показать график посещений NTK\n"
     builder = InlineKeyboardBuilder()
     builder.add(
         types.InlineKeyboardButton(text='📚NTK chat', url='https://t.me/chat_ntk'),
@@ -67,29 +87,29 @@ async def help(message: types.Message):
     )
     builder.adjust(1)
     await message.answer(
-        text=text, 
-        reply_markup=builder.as_markup(), 
+        text=text,
+        reply_markup=builder.as_markup(),
         disable_web_page_preview=True,
         parse_mode='HTML'
-        )
+    )
 
 
 @router.message(Command('graph'), NTKChatFilter())
 async def send_stats(message: types.Message, bot: Bot):
     """Send graph with NTK visits prediction and weather forecast """
     fig_visits, _ = await plotGraph.daily_graph_with_predictions()
-    
+
     buffer_visits = io.BytesIO()
     fig_visits.savefig(buffer_visits, format='png')
     buffer_visits.seek(0)
-    
+
     await bot.send_photo(
-        chat_id=message.chat.id, 
+        chat_id=message.chat.id,
         photo=types.BufferedInputFile(
             file=buffer_visits.read(),
             filename='visits.png',
-            )
         )
+    )
     await message.delete()
 
 
@@ -97,18 +117,18 @@ async def send_stats(message: types.Message, bot: Bot):
 async def send_weather(message: types.Message, bot: Bot):
     """Send weather forecast"""
     fig_weather, _, _ = await weatherAPI.plot_daily_weather_forecast()
-    
+
     buffer_weather = io.BytesIO()
     fig_weather.savefig(buffer_weather, format='png')
     buffer_weather.seek(0)
-    
+
     await bot.send_photo(
-        chat_id=message.chat.id, 
+        chat_id=message.chat.id,
         photo=types.BufferedInputFile(
             file=buffer_weather.read(),
             filename='weather.png',
-            )
         )
+    )
     await message.delete()
 
 
@@ -125,9 +145,9 @@ async def send_data(msg: types.Message, bot: Bot):
     """Send ntk_data.txt with NTK visits"""
     with open('ntk_data.txt', 'rb') as file:
         input_file = types.BufferedInputFile(
-            file=file.read(), 
+            file=file.read(),
             filename='ntk_data.txt'
-            )
+        )
         await bot.send_document(msg.chat.id, input_file)
 
 

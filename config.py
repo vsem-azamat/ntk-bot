@@ -37,5 +37,7 @@ class Config:
     with open(instructions_path, 'r') as file:
         INSTRUCTIONS = file.read()
 
+    ANON_ENABLED: bool = True
+
 cnfg = Config()
 
