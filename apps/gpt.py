@@ -10,17 +10,17 @@ async def get_gpt_response(message: str) -> str | None:
     model="gpt-4o",
     messages=[
         {
-        "role": "system",
-        "content": cnfg.INSTRUCTIONS
+            "role": "system",
+            "content": cnfg.INSTRUCTIONS
         },
         {
-        "role": "user",
-        "content": [
-            {
-            "text": message,
-            "type": "text"
-            }
-        ]
+            "role": "user",
+            "content": [
+                {
+                "text": message,
+                "type": "text"
+                }
+            ]
         }
     ],
     temperature=1,
