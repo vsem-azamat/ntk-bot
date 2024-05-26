@@ -12,6 +12,7 @@ class Config:
     ID_NTK_SMALL_CHAT: int = -1001384533622
     ID_NTK_CHANNEL: int = -1001918057675
     SUPER_ADMINS: List[int] = [int(id_admin) for id_admin in str(config('SUPER_ADMINS', cast=str, default='')).split(',') if id_admin]
+    ANON_ENABLED: bool = True
 
     # >>>>>>>>>> FILES <<<<<<<<<< #
     BAD_WORDS = []
@@ -36,8 +37,8 @@ class Config:
     assert os.path.exists(instructions_path), f"Instrucions file not found: {instructions_path}"
     with open(instructions_path, 'r') as file:
         INSTRUCTIONS = file.read()
+    GPT_ANSWER_PROBABILITY: float = config('ANSWER_PROBABILITY', cast=float, default=0.025)
 
-    ANON_ENABLED: bool = True
 
 cnfg = Config()
 
