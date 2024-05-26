@@ -23,11 +23,16 @@ async def anon(message: types.Message, bot: Bot):
     text_head = "<b>💌Анон плс:</b>\n\n"
     text = message.text[6:].strip()
     if message.chat.id == message.from_user.id and text:
-        await bot.send_message(
+        member = await bot.get_chat_member(
             chat_id=cnfg.ID_NTK_BIG_CHAT,
-            text=text_head + text,
-            parse_mode='HTML'
+            user_id=message.from_user.id
             )
+        if member.status in ['creator', 'administrator', 'member']:
+            await bot.send_message(
+                chat_id=cnfg.ID_NTK_BIG_CHAT,
+                text=text_head + text,
+                parse_mode='HTML'
+                )
     else:
         await message.delete()
 
@@ -48,7 +53,6 @@ async def ntk(message: types.Message):
 
 @router.message(Command('help'))
 async def help(message: types.Message):
-    print(message)
     """Send help message"""
     text = \
     "🤖<b>Хай, я создан для чата @chat_ntk!</b>\n\n"\
@@ -131,7 +135,7 @@ async def send_data(msg: types.Message, bot: Bot):
 async def gpt_bullying(message: types.Message):
     """Random GPT response"""
     text = message.text
-    if text and random.random() < 0.00015:
+    if text and random.random() < 0.025:
         response = await get_gpt_response(text)
         if response:
             await message.reply(str(response))
