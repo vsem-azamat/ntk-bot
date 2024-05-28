@@ -12,7 +12,7 @@ router = Router()
 async def anon_enable(message: types.Message):
     """Enable anon functionality"""
     cnfg.ANON_ENABLED = True
-    await message.answer("🤖<b>Анон включен</b>\n")
+    await message.answer("🤖<b>Анон включен</b>\n", parse_mode='HTML')
     await message.delete()
 
 
@@ -20,7 +20,7 @@ async def anon_enable(message: types.Message):
 async def anon_disable(message: types.Message):
     """Disable anon functionality"""
     cnfg.ANON_ENABLED = False
-    await message.answer("🤖<b>Анон выключен</b>\n")
+    await message.answer("🤖<b>Анон выключен</b>\n", parse_mode='HTML')
     await message.delete()
 
 
@@ -28,7 +28,7 @@ async def anon_disable(message: types.Message):
 async def anon(message: types.Message, bot: Bot):
     """Send anon message"""
     if not cnfg.ANON_ENABLED:
-        await message.reply("💤<b>Анончик сейчас спит</b>💤")
+        await message.reply("💤<b>Анончик сейчас спит</b>💤", parse_mode='HTML')
         await message.delete()
         return
 
@@ -37,7 +37,7 @@ async def anon(message: types.Message, bot: Bot):
     if message.chat.id == message.from_user.id and text:
         member = await bot.get_chat_member(
             chat_id=cnfg.ID_NTK_BIG_CHAT,
-            user_id=message.from_user.id
+            user_id=message.from_user.id,
             )
         if member.status in ['creator', 'administrator', 'member']:
             await bot.send_message(
