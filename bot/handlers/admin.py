@@ -37,3 +37,23 @@ async def admin(message: types.Message, bot: Bot):
 
     await message.delete()
 
+
+@router.message(Command('ban'), SuperAdmins())
+async def ban_user(message: types.Message):
+    """Ban user from chat"""
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+        await message.chat.ban(user_id=user_id)
+        await message.reply_to_message.delete()
+        return
+    await message.delete()
+
+
+@router.message(Command('unban'), SuperAdmins())
+async def unban_user(message: types.Message):
+    """Unban user from chat"""
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+        await message.chat.unban(user_id=user_id)
+        return
+    await message.delete()
