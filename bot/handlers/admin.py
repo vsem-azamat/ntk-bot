@@ -1,3 +1,4 @@
+import datetime
 from aiogram import Bot, Router, types
 from aiogram.filters import Command
 
@@ -57,3 +58,51 @@ async def unban_user(message: types.Message):
         await message.chat.unban(user_id=user_id)
         return
     await message.delete()
+
+
+@router.message(Command('mute'), SuperAdmins())
+async def mute_user(message: types.Message):
+    """Mute user in chat"""
+    if message.reply_to_message:
+        time_mute = message.text[6:].strip()
+        if time_mute and time_mute.isdigit():
+            time_mute = int(time_mute)
+        else:
+            time_mute = 5
+        current_time = datetime.datetime.now() + datetime.timedelta(minutes=time_mute)
+        user_id = message.reply_to_message.from_user.id
+        await message.chat.restrict(
+            user_id=user_id,
+            permissions=types.ChatPermissions(),
+            until_date=current_time
+            )
+        await message.reply_to_message.reply(f'User muted for {time_mute} minutes')
+
+
+@router.message(Command('admin'), SuperAdmins())
+async def make_admin(message: types.Message):
+    """Make user admin in chat"""
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+        await message.chat.promote(
+            user_id=user_id,
+            can_manage_chat=True,
+            can_delete_messages=True,
+            can_manage_video_chats=True,
+            can_restrict_members=True,
+            can_promote_members=True,
+            can_change_info=True,
+            can_invite_users=True,
+            can_pin_messages=True,
+            )
+    await message.delete()
+
+
+@router.message(Command('unadmin'), SuperAdmins())
+async def unadmin(message: types.Message):
+    """Remove admin rights from user"""
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+        await message.chat.promote(user_id=user_id)
+    await message.delete()
+
