@@ -35,7 +35,7 @@ async def anon_disable(message: types.Message):
 async def reveal_enable(message: types.Message):
     """Enable reveal functionality"""
     cnfg.ANON_REVEAL_ENABLED = True
-    await message.answer(f"🔎<b>Раскрытие анона с шансом: {REVEAL_ANON_PROBABILITY_DISPLAY}</b>\n", parse_mode='HTML')
+    await message.answer(f"🔎<b>Раскрытие анона с шансом: {REVEAL_ANON_PROBABILITY_DISPLAY}%</b>\n", parse_mode='HTML')
     await message.delete()
 
 
