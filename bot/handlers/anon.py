@@ -27,7 +27,7 @@ async def anon_disable(message: types.Message):
     await message.delete()
 
 
-@router.message(Command('reveal'))
+@router.message(Command('reveal'), SuperAdmins())
 async def reveal(message: types.Message):
     """Change reveal probability"""
     builder = InlineKeyboardBuilder()
@@ -45,7 +45,7 @@ async def reveal(message: types.Message):
     await message.delete()
 
 
-@router.callback_query(lambda callback_query: callback_query.data.startswith('reveal:'))
+@router.callback_query(lambda callback_query: callback_query.data.startswith('reveal:'), SuperAdmins())
 async def set_reveal(callback_query: types.CallbackQuery, bot: Bot):
     """Set reveal probability"""
     probability = float(callback_query.data.split(':')[1])
