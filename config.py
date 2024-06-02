@@ -16,7 +16,6 @@ class Config:
     
     # >>>>>>>>>> ANON <<<<<<<<<< #
     ANON_ENABLED: bool = True
-    ANON_REVEAL_ENABLED: bool = True
     REVEAL_ANON_PROBABILITY = 0.1
 
     # >>>>>>>>>> FILES <<<<<<<<<< #

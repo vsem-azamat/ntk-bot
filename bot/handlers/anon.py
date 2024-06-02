@@ -27,20 +27,31 @@ async def anon_disable(message: types.Message):
     await message.delete()
 
 
-@router.message(Command('reveal_enable'), SuperAdmins())
-async def reveal_enable(message: types.Message):
-    """Enable reveal functionality"""
-    cnfg.ANON_REVEAL_ENABLED = True
-    await message.answer(f"🔎<b>Раскрытие анона с шансом: {int(cnfg.ANON_REVEAL_ENABLED*100)}%</b>\n", parse_mode='HTML')
+@router.message(Command('reveal'))
+async def reveal(message: types.Message):
+    """Change reveal probability"""
+    builder = InlineKeyboardBuilder()
+    builder.row()
+    builder.button(text='1%', callback_data='reveal:0.01')
+    builder.button(text='5%', callback_data='reveal:0.05')
+    builder.button(text='10%', callback_data='reveal:0.1')
+    builder.button(text='20%', callback_data='reveal:0.2')
+    builder.button(text='30%', callback_data='reveal:0.3')
+    builder.button(text='40%', callback_data='reveal:0.4')
+    builder.button(text='50%', callback_data='reveal:0.5')
+    builder.button(text='Disable', callback_data='reveal:-1')
+    builder.adjust(2)
+    await message.answer("🤖<b>Вероятность раскрытия анона:</b>", reply_markup=builder.as_markup(), parse_mode='HTML')
     await message.delete()
 
 
-@router.message(Command('reveal_disable'), SuperAdmins())
-async def reveal_disable(message: types.Message):
-    """Disable reveal functionality"""
-    cnfg.ANON_REVEAL_ENABLED = False
-    await message.answer(f"🔎<b>Раскрытие анона выключено</b>\n", parse_mode='HTML')
-    await message.delete()
+@router.callback_query(lambda callback_query: callback_query.data.startswith('reveal:'))
+async def set_reveal(callback_query: types.CallbackQuery, bot: Bot):
+    """Set reveal probability"""
+    probability = float(callback_query.data.split(':')[1])
+    cnfg.REVEAL_ANON_PROBABILITY = probability
+    await callback_query.message.edit_text(f"🤖<b>Вероятность раскрытия анона:</b> {int(probability*100)}%", parse_mode='HTML')
+    await callback_query.answer()
 
 
 @router.message(Command('anon'))
@@ -74,15 +85,13 @@ async def anon(message: types.Message, bot: Bot):
                 await message.delete()
                 return
 
-            # Check: Random reveal is enabled
-            reveal_identity = False
-            if cnfg.ANON_REVEAL_ENABLED:
-                reveal_identity = random.random() < cnfg.REVEAL_ANON_PROBABILITY
-                username = message.from_user.username
-                user_link = message.from_user.full_name
-                if username: user_link = f'<a href="t.me/{username}">{message.from_user.full_name}</a>'
+            # Check: Random reveal identity
+            reveal_identity = random.random() < cnfg.REVEAL_ANON_PROBABILITY
+            username = user_link = message.from_user.username
+            user_link = message.from_user.full_name
+            if username: user_link = f'<a href="t.me/{username}">{message.from_user.full_name}</a>'
                 
-            text_head = "<b>💌Анон плс:</b>\n\n" if not reveal_identity else f"<b>💌Анон плс, от {user_link}:</b>\n\n"
+            text_head = "<b>💌Анон плс:</b>\n\n" if reveal_identity else f"<b>💌Анон плс, от {user_link}:</b>\n\n"
 
             await bot.send_message(
                 chat_id=cnfg.ID_NTK_BIG_CHAT,
