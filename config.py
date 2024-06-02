@@ -12,8 +12,12 @@ class Config:
     ID_NTK_SMALL_CHAT: int = -1001384533622
     ID_NTK_CHANNEL: int = -1001918057675
     SUPER_ADMINS: List[int] = [int(id_admin) for id_admin in str(config('SUPER_ADMINS', cast=str, default='')).split(',') if id_admin]
+    
+    
+    # >>>>>>>>>> ANON <<<<<<<<<< #
     ANON_ENABLED: bool = True
     ANON_REVEAL_ENABLED: bool = True
+    REVEAL_ANON_PROBABILITY = 0.1
 
     # >>>>>>>>>> FILES <<<<<<<<<< #
     BAD_WORDS = []
