@@ -8,3 +8,4 @@ logs/
 ntk_data.txt
 venv/
 .instructions
+*.pkl
