@@ -79,6 +79,23 @@ async def mute_user(message: types.Message):
         await message.reply_to_message.reply(f'User muted for {time_mute} minutes')
 
 
+@router.message(Command('unmute'), SuperAdmins())
+async def unmute_user(message: types.Message):
+    """Unmute user in chat"""
+    if message.reply_to_message:
+        user_id = message.reply_to_message.from_user.id
+        await message.chat.restrict(
+            user_id=user_id,
+            permissions=types.ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_invite_users=True
+            ),
+        )
+        await message.reply_to_message.reply(f'User unmuted')
+
+
 @router.message(Command('admin'), SuperAdmins())
 async def make_admin(message: types.Message):
     """Make user admin in chat"""
