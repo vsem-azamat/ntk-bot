@@ -13,7 +13,6 @@ async def ntk(message: types.Message):
     """Send ntk quantity"""
     q = await get_ntk_quantity()
     text = f"📚<b>В NTK сейчас людей:</b> {q}"
-    text += '\nДохуя крч.' if q >= 700 else ''
     text += "\n\n📣<a href='t.me/ntk_info'><b>NTK info</b></a>"
     await message.answer(
         text=text,
