@@ -1,0 +1,31 @@
+name: ntk-bot
+
+services:
+  bot:
+    image: ${NTK_BOT_IMAGE:?NTK_BOT_IMAGE is required}
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - ntk_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os,sys,time;
+          p='/data/heartbeat';
+          sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p) < 180 else 1)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  ntk_data:
