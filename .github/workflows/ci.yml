@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, Type, Test, Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.x"
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run ty check
+
+      - name: Tests
+        env:
+          BOT_TOKEN: ci-token
+        run: uv run pytest
+
+      - name: Validate compose file
+        run: |
+          set -euo pipefail
+          cat > /tmp/ntk.env <<'EOF'
+          NTK_BOT_IMAGE=ghcr.io/vsem-azamat/ntk-bot:ci
+          BOT_TOKEN=ci-token
+          SUPER_ADMINS=
+          DELTA_TIME=20
+          OPENROUTER_API_KEY=
+          OPENROUTER_MODEL=openai/gpt-4o
+          ANSWER_PROBABILITY=0.025
+          DATA_DIR=/data
+          EOF
+          cp /tmp/ntk.env .env
+          docker compose --env-file /tmp/ntk.env -f infra/docker-compose.prod.yml config >/dev/null
+          rm -f .env
+
+      - name: Validate Docker build
+        run: docker build -f infra/Dockerfile -t ntk-bot:ci .
