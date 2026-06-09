@@ -11,6 +11,7 @@ RUN uv sync --frozen --no-dev
 
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS runtime
 ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH=/app \
     MPLBACKEND=Agg \
     PYTHONUNBUFFERED=1 \
     DATA_DIR=/data
