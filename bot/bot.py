@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher
 
 from apps.schedule_functions import receive_ntk_data
 from bot.handlers import router
-from config import INSTRUCTIONS_PATH, cnfg, ensure_data_file
+from config import INSTRUCTIONS_PATH, cnfg
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 async def on_startup(bot: Bot) -> None:
     await bot.delete_webhook()
     from apps.predictModels import predictModels
-
-    ensure_data_file()
 
     if not cnfg.OPENROUTER_API_KEY:
         logger.warning("OPENROUTER_API_KEY is not set; GPT replies are disabled")
