@@ -54,9 +54,10 @@ async def set_reveal(callback_query: types.CallbackQuery, bot: Bot):
     """Set reveal probability"""
     probability = float(callback_query.data.split(":")[1])
     cnfg.REVEAL_ANON_PROBABILITY = probability
-    await callback_query.message.edit_text(
-        f"🤖<b>Вероятность раскрытия анона:</b> {int(probability * 100)}%", parse_mode="HTML"
-    )
+    if isinstance(callback_query.message, types.Message):
+        await callback_query.message.edit_text(
+            f"🤖<b>Вероятность раскрытия анона:</b> {int(probability * 100)}%", parse_mode="HTML"
+        )
     await callback_query.answer()
 
 

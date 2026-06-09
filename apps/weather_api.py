@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 
+import aiohttp
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
-import requests
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
@@ -32,9 +32,11 @@ class WeatherAPI:
 
     async def __get_weather_data(self, params: dict | None = None) -> dict:
         params = params or {}
-        response = requests.get(url=self.url, params=self.default_params | params)
-        data = response.json()
-        return data
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(self.url, params=self.default_params | params) as response,
+        ):
+            return await response.json()
 
     async def get_current_weather(self) -> dict:
         """Get current weather data"""

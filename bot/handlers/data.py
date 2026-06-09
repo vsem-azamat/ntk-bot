@@ -7,6 +7,7 @@ from apps.plot_functions import plotGraph
 from apps.predictModels import predictModels
 from apps.weather_api import weatherAPI
 from bot.filters import NTKChatFilter, SuperAdmins
+from config import cnfg
 
 router = Router()
 
@@ -60,6 +61,6 @@ async def learn_models(msg: types.Message):
 @router.message(Command("data"), SuperAdmins())
 async def send_data(msg: types.Message, bot: Bot):
     """Send ntk_data.txt with NTK visits"""
-    with open("ntk_data.txt", "rb") as file:
+    with open(cnfg.NTK_DATA_PATH, "rb") as file:
         input_file = types.BufferedInputFile(file=file.read(), filename="ntk_data.txt")
         await bot.send_document(msg.chat.id, input_file)
