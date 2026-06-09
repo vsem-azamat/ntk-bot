@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
-from typing import List
 
 
-async def generaet_datetime_list(start_datetime: datetime, end_datetime: datetime, delta_minutes: int = 20) -> List[datetime]:
+async def generate_datetime_list(
+    start_datetime: datetime, end_datetime: datetime, delta_minutes: int = 20
+) -> list[datetime]:
     time_list = []
     while start_datetime <= end_datetime:
         time_list.append(start_datetime)
@@ -10,7 +11,7 @@ async def generaet_datetime_list(start_datetime: datetime, end_datetime: datetim
     return time_list
 
 
-async def generaet_time_list(delta_minutes: int = 20) -> List[str]:
+async def generate_time_list(delta_minutes: int = 20) -> list[str]:
     start_time = "08:00"
     end_time = "02:00"
 
