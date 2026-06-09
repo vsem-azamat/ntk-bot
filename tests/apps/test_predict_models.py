@@ -23,6 +23,16 @@ def test_extract_features_shape_and_values():
     assert feats[0].tolist() == [61, 4, 570, 3]
 
 
+def test_model_filename_honors_data_dir(monkeypatch):
+    from apps import predictModels
+
+    monkeypatch.setattr(predictModels.cnfg, "DATA_DIR", "/data")
+    assert (
+        predictModels.model_filename("RandomForestRegressor")
+        == "/data/model_RandomForestRegressor.pkl"
+    )
+
+
 async def test_remove_zero_values_skips_zero_and_malformed_lines():
     data = [
         "2024-03-01 09:30 - 42",
