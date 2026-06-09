@@ -7,5 +7,6 @@ logs/
 *.log
 ntk_data.txt
 venv/
+.venv/
 .instructions
 *.pkl

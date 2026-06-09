@@ -1,4 +1,5 @@
 import datetime
+
 from aiogram import Bot, Router, types
 from aiogram.filters import Command
 
@@ -7,39 +8,31 @@ from bot.filters import NTKChatFilter, SuperAdmins
 router = Router()
 
 
-@router.message(Command('nick'), SuperAdmins(), NTKChatFilter())
+@router.message(Command("nick"), SuperAdmins(), NTKChatFilter())
 async def admin(message: types.Message, bot: Bot):
     """Give nickname title to user in NTK chat"""
     bot_info = await bot.me()
-    bot_chat_info = await bot.get_chat_member(
-        chat_id=message.chat.id,
-        user_id=bot_info.id
-    )
-    if isinstance(bot_chat_info, types.ChatMemberAdministrator):
-        if bot_chat_info.can_promote_members:
-            new_nick = message.text[6:].strip()
-            if new_nick and message.reply_to_message:
-                user_id = message.reply_to_message.from_user.id
-                user_info = await bot.get_chat_member(
-                    chat_id=message.chat.id,
-                    user_id=user_id
-                    )
-                if not isinstance(user_info, types.ChatMemberAdministrator):
-                    await message.chat.promote(
-                        user_id=user_id, 
-                        can_invite_users=True
-                        )
-                await message.chat.set_administrator_custom_title(
-                    user_id=user_id,
-                    custom_title=new_nick
-                    )
-            await message.delete()
-            return
+    bot_chat_info = await bot.get_chat_member(chat_id=message.chat.id, user_id=bot_info.id)
+    if (
+        isinstance(bot_chat_info, types.ChatMemberAdministrator)
+        and bot_chat_info.can_promote_members
+    ):
+        new_nick = message.text[6:].strip()
+        if new_nick and message.reply_to_message:
+            user_id = message.reply_to_message.from_user.id
+            user_info = await bot.get_chat_member(chat_id=message.chat.id, user_id=user_id)
+            if not isinstance(user_info, types.ChatMemberAdministrator):
+                await message.chat.promote(user_id=user_id, can_invite_users=True)
+            await message.chat.set_administrator_custom_title(
+                user_id=user_id, custom_title=new_nick
+            )
+        await message.delete()
+        return
 
     await message.delete()
 
 
-@router.message(Command('ban'), SuperAdmins())
+@router.message(Command("ban"), SuperAdmins())
 async def ban_user(message: types.Message):
     """Ban user from chat"""
     if message.reply_to_message:
@@ -50,7 +43,7 @@ async def ban_user(message: types.Message):
     await message.delete()
 
 
-@router.message(Command('unban'), SuperAdmins())
+@router.message(Command("unban"), SuperAdmins())
 async def unban_user(message: types.Message):
     """Unban user from chat"""
     if message.reply_to_message:
@@ -60,26 +53,21 @@ async def unban_user(message: types.Message):
     await message.delete()
 
 
-@router.message(Command('mute'), SuperAdmins())
+@router.message(Command("mute"), SuperAdmins())
 async def mute_user(message: types.Message):
     """Mute user in chat"""
     if message.reply_to_message:
-        time_mute = message.text[6:].strip()
-        if time_mute and time_mute.isdigit():
-            time_mute = int(time_mute)
-        else:
-            time_mute = 5
+        raw_time_mute = message.text[6:].strip()
+        time_mute = int(raw_time_mute) if raw_time_mute.isdigit() else 5
         current_time = datetime.datetime.now() + datetime.timedelta(minutes=time_mute)
         user_id = message.reply_to_message.from_user.id
         await message.chat.restrict(
-            user_id=user_id,
-            permissions=types.ChatPermissions(),
-            until_date=current_time
-            )
-        await message.reply_to_message.reply(f'User muted for {time_mute} minutes')
+            user_id=user_id, permissions=types.ChatPermissions(), until_date=current_time
+        )
+        await message.reply_to_message.reply(f"User muted for {time_mute} minutes")
 
 
-@router.message(Command('unmute'), SuperAdmins())
+@router.message(Command("unmute"), SuperAdmins())
 async def unmute_user(message: types.Message):
     """Unmute user in chat"""
     if message.reply_to_message:
@@ -90,13 +78,13 @@ async def unmute_user(message: types.Message):
                 can_send_messages=True,
                 can_send_media_messages=True,
                 can_send_other_messages=True,
-                can_invite_users=True
+                can_invite_users=True,
             ),
         )
-        await message.reply_to_message.reply(f'User unmuted')
+        await message.reply_to_message.reply("User unmuted")
 
 
-@router.message(Command('admin'), SuperAdmins())
+@router.message(Command("admin"), SuperAdmins())
 async def make_admin(message: types.Message):
     """Make user admin in chat"""
     if message.reply_to_message:
@@ -111,15 +99,14 @@ async def make_admin(message: types.Message):
             can_change_info=True,
             can_invite_users=True,
             can_pin_messages=True,
-            )
+        )
     await message.delete()
 
 
-@router.message(Command('unadmin'), SuperAdmins())
+@router.message(Command("unadmin"), SuperAdmins())
 async def unadmin(message: types.Message):
     """Remove admin rights from user"""
     if message.reply_to_message:
         user_id = message.reply_to_message.from_user.id
         await message.chat.promote(user_id=user_id)
     await message.delete()
-

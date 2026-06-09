@@ -1,18 +1,33 @@
 import asyncio
+import logging
+
 from aiogram import Bot, Dispatcher
 
-from config import cnfg
+from apps.schedule_functions import receive_ntk_data
 from bot.handlers import router
-from apps.schedule_functions import recieve_ntk_data
+from config import INSTRUCTIONS_PATH, cnfg, ensure_data_file
+
+logger = logging.getLogger(__name__)
 
 
 async def on_startup(bot: Bot) -> None:
     await bot.delete_webhook()
     from apps.predictModels import predictModels
 
-    # Run learning models
-    await predictModels.learn_models()
-    asyncio.create_task(recieve_ntk_data(cnfg.DELTA_TIME_FOR_RECIEVE_NTK))
+    ensure_data_file()
+
+    if not cnfg.OPENROUTER_API_KEY:
+        logger.warning("OPENROUTER_API_KEY is not set; GPT replies are disabled")
+    if not cnfg.INSTRUCTIONS:
+        logger.warning(
+            "Instructions file '%s' is missing; GPT will use an empty system prompt",
+            INSTRUCTIONS_PATH,
+        )
+
+    # Train the models and collect occupancy data in the background so that
+    # polling starts immediately instead of blocking on model training.
+    asyncio.create_task(predictModels.learn_models())
+    asyncio.create_task(receive_ntk_data(cnfg.DELTA_TIME_FOR_RECIEVE_NTK))
 
 
 async def on_shutdown(bot: Bot) -> None:
@@ -21,18 +36,19 @@ async def on_shutdown(bot: Bot) -> None:
 
 
 async def main() -> None:
+    logging.basicConfig(level=logging.INFO)
     bot = Bot(token=cnfg.BOT_TOKEN)
     dp = Dispatcher()
 
+    dp.include_router(router)
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
     try:
-        dp.include_router(router)
-        dp.startup.register(on_startup)
-        dp.shutdown.register(on_shutdown)
         await dp.start_polling(bot)
+    except Exception:
+        logger.exception("Polling stopped with an error")
 
-    except Exception as e:
-        print(e)
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())
