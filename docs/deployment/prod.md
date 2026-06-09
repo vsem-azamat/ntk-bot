@@ -71,10 +71,15 @@ container starts (one `getUpdates` consumer per token, else HTTP 409).
      cid=$(docker compose -f infra/docker-compose.prod.yml --env-file .env ps -q bot)
      docker cp legacy.txt        "$cid":/data/legacy.txt
      docker cp .instructions     "$cid":/data/.instructions
-     docker exec "$cid" python scripts/import_legacy_ntk_data.py /data/legacy.txt
+     docker exec "$cid" python -m scripts.import_legacy_ntk_data /data/legacy.txt
    '
    ```
-   Expected output: `imported=~105000 skipped=<small> total_rows_in_db=~105000`.
+   Run the importer with `python -m scripts.import_legacy_ntk_data` (module
+   form) so `/app` is on `sys.path` and `import bot` resolves. The image also
+   sets `PYTHONPATH=/app`, so `python scripts/import_legacy_ntk_data.py …` works
+   too. Expected output: `imported=~105000 skipped=<small> total_rows_in_db=~105000`.
+   Note: a `model_RandomForestRegressor.pkl` retrained on the full series is
+   ~740 MB and lives on the `ntk_data` volume.
 5. Retrain the models on-host (in Telegram, as a super admin: `/learn`), or:
    ```sh
    ssh azamat 'cd /home/azamat/deploy/ntk-bot && \
