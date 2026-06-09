@@ -86,3 +86,14 @@ Prefixes: `!/`
 - `/graph` - Draw and send a diagram of library visits
 - `/learn` - Train (re-) regression ML models for predicting the number of people in the library
 - `/weather` - Show weather forecast
+
+## Deployment
+
+Production runs on the `azamat` VPS as a Docker Compose stack, delivered by
+GitHub Actions (build → GHCR → SSH deploy). Occupancy data lives in SQLite on a
+persistent volume (`/data/ntk.sqlite`). See
+[`docs/deployment/prod.md`](docs/deployment/prod.md) for the runbook and the
+one-time cutover from the legacy manual deployment.
+
+Local dev still uses `uv run ntk-bot` with a `.env`; data is written to
+`./ntk.sqlite` (overridable with `DATA_DIR`).
