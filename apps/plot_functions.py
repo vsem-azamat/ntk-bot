@@ -16,7 +16,6 @@ from apps.predictModels import (
     parse_row_datetime,
     predictModels,
 )
-from config import cnfg
 
 # Colour used to draw each model's prediction line.
 MODEL_COLORS = {
@@ -30,14 +29,12 @@ class PlotGraphs:
     async def get_ntk_data(
         self, start_datetime: datetime, end_datetime: datetime
     ) -> tuple[list[datetime], list[int]]:
-        """Get occupancy data from file within the given datetime range."""
+        """Get occupancy data from SQLite within the given datetime range."""
+        from bot import db  # local import to avoid circular dependency
+
         datetimes: list[datetime] = []
         quantities: list[int] = []
-        try:
-            with open(cnfg.NTK_DATA_PATH, encoding="utf-8") as file:
-                data = await predictModels.remove_zero_values(list(file))
-        except FileNotFoundError:
-            return datetimes, quantities
+        data = await predictModels.remove_zero_values(db.iter_rows())
         for row in data:
             row_datetime = parse_row_datetime(row)
             if start_datetime <= row_datetime <= end_datetime:
