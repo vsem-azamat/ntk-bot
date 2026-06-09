@@ -61,7 +61,5 @@ async def learn_models(msg: types.Message):
 @router.message(Command("data"), SuperAdmins())
 async def send_data(msg: types.Message, bot: Bot):
     """Send the occupancy series exported from SQLite."""
-    input_file = types.BufferedInputFile(
-        file=db.export_text(), filename="ntk_data.txt"
-    )
+    input_file = types.BufferedInputFile(file=db.export_text(), filename="ntk_data.txt")
     await bot.send_document(msg.chat.id, input_file)
