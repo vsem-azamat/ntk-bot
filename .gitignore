@@ -5,7 +5,10 @@
 *.py[cod]
 logs/
 *.log
-ntk_data.txt
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+heartbeat
 venv/
 .venv/
 .instructions
