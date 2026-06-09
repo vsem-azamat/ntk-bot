@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from typing import TypeAlias
 
 import joblib
@@ -14,8 +15,8 @@ ModelsML: TypeAlias = RandomForestRegressor | GradientBoostingRegressor
 
 
 def model_filename(model_name: str) -> str:
-    """Return the on-disk filename for a model given its class name."""
-    return f"model_{model_name}.pkl"
+    """Return the on-disk path for a model given its class name."""
+    return str(Path(cnfg.DATA_DIR) / f"model_{model_name}.pkl")
 
 
 def parse_row_datetime(row: str) -> datetime:
@@ -66,11 +67,9 @@ class PredictModels:
         return rows
 
     async def learn_models(self) -> None:
-        try:
-            with open(cnfg.NTK_DATA_PATH, encoding="utf-8") as file:
-                data = [row.strip() for row in file]
-        except FileNotFoundError:
-            return
+        from bot import db  # local import to avoid circular dependency
+
+        data = db.iter_rows()
         if len(data) > 10:
             await self.perform_regression(data, RandomForestRegressor())
             await self.perform_regression(data, GradientBoostingRegressor())
