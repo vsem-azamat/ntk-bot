@@ -3,7 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
-from apps.schedule_functions import receive_ntk_data
+from apps.schedule_functions import heartbeat_loop, receive_ntk_data
 from bot import db
 from bot.handlers import router
 from config import INSTRUCTIONS_PATH, cnfg
@@ -25,8 +25,10 @@ async def on_startup(bot: Bot) -> None:
             INSTRUCTIONS_PATH,
         )
 
-    # Train the models and collect occupancy data in the background so that
-    # polling starts immediately instead of blocking on model training.
+    # Keep the liveness heartbeat fresh regardless of the collection loop's
+    # long post-sample sleep, then train models and collect data in the
+    # background so polling starts immediately.
+    asyncio.create_task(heartbeat_loop())
     asyncio.create_task(predictModels.learn_models())
     asyncio.create_task(receive_ntk_data(cnfg.DELTA_TIME_FOR_RECIEVE_NTK))
 
