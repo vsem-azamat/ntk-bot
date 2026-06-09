@@ -11,6 +11,10 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 async def get_gpt_response(message: str) -> str | None:
     """Ask the configured OpenRouter model to respond to ``message``."""
+    if not cnfg.OPENROUTER_API_KEY:
+        logger.warning("OPENROUTER_API_KEY is not set; skipping GPT response")
+        return None
+
     headers = {
         "Authorization": f"Bearer {cnfg.OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -36,6 +40,6 @@ async def get_gpt_response(message: str) -> str | None:
             response.raise_for_status()
             data = await response.json()
         return data["choices"][0]["message"]["content"]
-    except (aiohttp.ClientError, KeyError, IndexError):
+    except (aiohttp.ClientError, KeyError, IndexError, TypeError):
         logger.exception("OpenRouter request failed")
         return None

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import joblib
 import matplotlib.dates as mdates
@@ -9,7 +10,13 @@ from matplotlib.figure import Figure
 from scipy.interpolate import splev, splrep
 
 from apps.collect_time import generate_datetime_list
-from apps.predictModels import model_filename, predictModels
+from apps.predictModels import (
+    extract_features,
+    model_filename,
+    parse_row_datetime,
+    predictModels,
+)
+from config import cnfg
 
 # Colour used to draw each model's prediction line.
 MODEL_COLORS = {
@@ -24,15 +31,18 @@ class PlotGraphs:
         self, start_datetime: datetime, end_datetime: datetime
     ) -> tuple[list[datetime], list[int]]:
         """Get occupancy data from file within the given datetime range."""
-        with open("ntk_data.txt", encoding="utf-8") as file:
-            datetimes = []
-            quantities = []
-            data = await predictModels.remove_zero_values(list(file))
-            for row in data:
-                row_datetime = datetime.strptime(row.split(" - ")[0], "%Y-%m-%d %H:%M")
-                if start_datetime <= row_datetime <= end_datetime:
-                    quantities.append(int(row.split(" - ")[1].strip()))
-                    datetimes.append(row_datetime)
+        datetimes: list[datetime] = []
+        quantities: list[int] = []
+        try:
+            with open(cnfg.NTK_DATA_PATH, encoding="utf-8") as file:
+                data = await predictModels.remove_zero_values(list(file))
+        except FileNotFoundError:
+            return datetimes, quantities
+        for row in data:
+            row_datetime = parse_row_datetime(row)
+            if start_datetime <= row_datetime <= end_datetime:
+                quantities.append(int(row.split(" - ")[1].strip()))
+                datetimes.append(row_datetime)
         return datetimes, quantities
 
     async def daily_graph(
@@ -91,19 +101,17 @@ class PlotGraphs:
     ) -> tuple[Figure, Axes, datetime, datetime]:
         x_datetime = await generate_datetime_list(start_datetime, end_datetime, delta_minutes=10)
 
-        xPredict_day_of_year = [dt.timetuple().tm_yday for dt in x_datetime]
-        xPredict_day_of_week = [dt.weekday() for dt in x_datetime]
-        xPredict_total_minutes = [(dt.hour * 60 + dt.minute) for dt in x_datetime]
-        xPredict_months = [dt.month for dt in x_datetime]
-
         if model_name not in MODEL_COLORS:
             model_name = DEFAULT_MODEL
         color = MODEL_COLORS[model_name]
-        model = joblib.load(model_filename(model_name))
 
-        xPredict = np.column_stack(
-            (xPredict_day_of_year, xPredict_day_of_week, xPredict_total_minutes, xPredict_months)
-        )
+        # The model may not have been trained yet (e.g. too little data); skip its line.
+        model_path = model_filename(model_name)
+        if not Path(model_path).exists():
+            return fig, ax, start_datetime, end_datetime
+        model = joblib.load(model_path)
+
+        xPredict = extract_features(x_datetime)
         y = list(map(int, model.predict(xPredict)))
         ax = fig.axes[0]
 

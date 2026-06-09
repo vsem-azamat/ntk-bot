@@ -38,9 +38,10 @@ async def set_gpt_answer_probability(callback_query: types.CallbackQuery, bot: B
         cnfg.GPT_ANSWER_PROBABILITY = -1
         text_probability = "disable"
 
-    await callback_query.message.edit_text(
-        text=f"GPT answer probability: {text_probability}", reply_markup=None
-    )
+    if isinstance(callback_query.message, types.Message):
+        await callback_query.message.edit_text(
+            text=f"GPT answer probability: {text_probability}", reply_markup=None
+        )
 
 
 # IMPORTANT: This handler should be the last in the file

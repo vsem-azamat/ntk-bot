@@ -9,7 +9,6 @@ dependencies = [
     "aiohttp>=3.9",
     "beautifulsoup4>=4.12",
     "lxml>=5.1",
-    "requests>=2.31",
     "python-decouple>=3.8",
     "numpy>=1.26",
     "scipy>=1.12",

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from typing import TypeAlias
 
@@ -17,26 +18,35 @@ def model_filename(model_name: str) -> str:
     return f"model_{model_name}.pkl"
 
 
+def parse_row_datetime(row: str) -> datetime:
+    """Parse the timestamp from a '<YYYY-mm-dd HH:MM> - <count>' data row."""
+    return datetime.strptime(row.split(" - ")[0], "%Y-%m-%d %H:%M")
+
+
+def extract_features(datetimes: list[datetime]) -> np.ndarray:
+    """Build the model feature matrix: day of year, weekday, minutes, month."""
+    return np.column_stack(
+        (
+            [dt.timetuple().tm_yday for dt in datetimes],
+            [dt.weekday() for dt in datetimes],
+            [dt.hour * 60 + dt.minute for dt in datetimes],
+            [dt.month for dt in datetimes],
+        )
+    )
+
+
 class PredictModels:
     async def perform_regression(
         self, data: list[str], modelML: ModelsML
     ) -> tuple[ModelsML, float]:
         data = await self.remove_zero_values(data)
-        datetime_objects = [
-            datetime.strptime(row.split(" - ")[0], "%Y-%m-%d %H:%M") for row in data
-        ]
-
-        X_day_of_year = [dt.timetuple().tm_yday for dt in datetime_objects]
-        X_day_of_week = [dt.weekday() for dt in datetime_objects]
-        X_total_minutes = [(dt.hour * 60 + dt.minute) for dt in datetime_objects]
-        X_month = [dt.month for dt in datetime_objects]
-
-        X = np.column_stack((X_day_of_year, X_day_of_week, X_total_minutes, X_month))
+        X = extract_features([parse_row_datetime(row) for row in data])
         Y = np.array([int(row.split(" - ")[1]) for row in data])
 
         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1, random_state=42)
 
-        modelML.fit(X_train, Y_train)
+        # sklearn fit is CPU-bound; run it off the event loop so polling isn't blocked.
+        await asyncio.to_thread(modelML.fit, X_train, Y_train)
         joblib.dump(modelML, model_filename(type(modelML).__name__))
 
         y_pred = modelML.predict(X_test)
@@ -45,11 +55,22 @@ class PredictModels:
         return modelML, float(mse)
 
     async def remove_zero_values(self, data: list[str]) -> list[str]:
-        return [row for row in data if int(row.split(" - ")[1].strip()) != 0]
+        rows = []
+        for row in data:
+            try:
+                count = int(row.split(" - ")[1].strip())
+            except (IndexError, ValueError):
+                continue  # skip blank or malformed lines
+            if count != 0:
+                rows.append(row)
+        return rows
 
     async def learn_models(self) -> None:
-        with open(cnfg.NTK_DATA_PATH, encoding="utf-8") as file:
-            data = [row.strip() for row in file]
+        try:
+            with open(cnfg.NTK_DATA_PATH, encoding="utf-8") as file:
+                data = [row.strip() for row in file]
+        except FileNotFoundError:
+            return
         if len(data) > 10:
             await self.perform_regression(data, RandomForestRegressor())
             await self.perform_regression(data, GradientBoostingRegressor())
