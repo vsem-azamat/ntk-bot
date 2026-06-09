@@ -35,3 +35,11 @@ def test_import_is_idempotent(tmp_db):
     import_file(str(legacy))
     import_file(str(legacy))
     assert db.iter_rows() == ["2023-09-24 12:10 - 118"]
+
+
+def test_import_preserves_zero_counts(tmp_db):
+    legacy = tmp_db / "ntk_data.txt"
+    legacy.write_text("2023-09-24 12:10 - 0\n")
+    imported, skipped = import_file(str(legacy))
+    assert (imported, skipped) == (1, 0)
+    assert db.iter_rows() == ["2023-09-24 12:10 - 0"]
