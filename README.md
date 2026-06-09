@@ -14,7 +14,7 @@ Telegram bot in @chat_ntk chat for students who regularly visit the National Tec
 - [x] Predicting the number of people in the library based on the received data with ML models
 - [x] Weather forecasts
 - [ ] Anti-bot filter
-- [ ] Function for temporary self muta/ban from the chat so that students are not distracted from their studies
+- [ ] Function for temporary self mute/ban from the chat so that students are not distracted from their studies
 
 ## Data sources:
 - [NTK website](https://www.techlib.cz/)
@@ -22,7 +22,7 @@ Telegram bot in @chat_ntk chat for students who regularly visit the National Tec
 
 
 ## How prediction works:
-The data of visits to the People's Technical Library is permanently stored. This data was processed and fed to models for training according to this principle:
+The data of visits to the National Technical Library is permanently stored. This data was processed and fed to models for training according to this principle:
 
 | X1 | X2 | X3 | X4 | Y |
 |:---:|:---:|:---:|:---:| :---:|
@@ -36,13 +36,14 @@ Two models are used:
 
 ## Installation and start
 
+The project is managed with [uv](https://docs.astral.sh/uv/).
+
 ### Necessary:
-Install requirements packages
+Install dependencies (creates a virtual environment from `uv.lock`)
 ```sh
-> python3 -m venv venv
-> pip install -r requirements.txt
+> uv sync
 ```
-Create `.env` file and write **api token**
+Create a `.env` file and add the **bot token**
 ```env
 BOT_TOKEN=<TOKEN>
 ```
@@ -50,17 +51,32 @@ BOT_TOKEN=<TOKEN>
 ### Start:
 From the root directory of the project
 ```sh
-> python3 main.py
+> uv run ntk-bot
 ```
+(equivalently `uv run python -m bot`)
 
 ### Optional:
 Additional adjustable values in `.env`
 ```env
 DELTA_TIME=<int>
 SUPER_ADMINS=<int,int,int,...>
+OPENROUTER_API_KEY=<KEY>
+OPENROUTER_MODEL=<slug>
+ANSWER_PROBABILITY=<float>
 ```
 * `DELTA_TIME` - The time interval with which the bot collects visit data from the site. The default value is `20`
-* `SUPER_ADMINS` - List of super admins for admin commands 
+* `SUPER_ADMINS` - List of super admins for admin commands
+* `OPENROUTER_API_KEY` - [OpenRouter](https://openrouter.ai/) key used for the random GPT replies
+* `OPENROUTER_MODEL` - Model slug passed to OpenRouter. Default `openai/gpt-4o`
+* `ANSWER_PROBABILITY` - Probability of a random GPT reply. Default `0.025`
+
+### Development:
+```sh
+> uv run ruff format .      # format
+> uv run ruff check .       # lint
+> uv run ty check           # type-check
+> uv run pytest             # tests
+```
 
 
 ## Commands:
