@@ -5,7 +5,6 @@ from pathlib import Path
 
 from apps.collect_time import generate_time_list
 from apps.parse_functions import get_ntk_quantity
-from bot import db
 from config import cnfg
 
 logger = logging.getLogger(__name__)
@@ -19,12 +18,25 @@ def _touch_heartbeat() -> None:
         logger.exception("Failed to update heartbeat file")
 
 
+async def heartbeat_loop(interval_seconds: float = 30) -> None:
+    """Refresh the liveness file on a fixed cadence, independent of collection.
+
+    The collection loop sleeps for ~19 minutes after each sample, far longer
+    than the container healthcheck window, so liveness cannot be tied to it.
+    This dedicated loop keeps the heartbeat fresh whenever the event loop runs.
+    """
+    while True:
+        _touch_heartbeat()
+        await asyncio.sleep(interval_seconds)
+
+
 async def receive_ntk_data(delta_minutes: int = 20) -> None:
     """Collect occupancy data from the NTK website every ``delta_minutes``."""
+    from bot import db  # local import avoids a circular import at module load
+
     time_list = await generate_time_list(delta_minutes=delta_minutes)
 
     while True:
-        _touch_heartbeat()
         current_time = datetime.now().strftime("%H:%M")
         if current_time in time_list:
             try:
