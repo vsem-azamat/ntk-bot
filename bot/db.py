@@ -21,12 +21,48 @@ def _connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create the data directory and occupancy table if they do not exist."""
+    """Create the data directory and tables if they do not exist."""
     Path(cnfg.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     with closing(_connect()) as conn, conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS occupancy ( ts TEXT PRIMARY KEY, people INTEGER NOT NULL)"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS weather ("
+            " ts TEXT PRIMARY KEY, temp REAL, precip REAL, cloud REAL, wind REAL)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS digest ("
+            " post_date TEXT PRIMARY KEY, chat_id INTEGER, message_id INTEGER,"
+            " last_update_hour INTEGER)"
+        )
+
+
+def get_digest_state() -> tuple[str, int, int, int] | None:
+    """Return the single active digest row ``(post_date, chat_id, message_id,
+    last_update_hour)`` or ``None`` if no digest is tracked."""
+    with closing(_connect()) as conn, conn:
+        row = conn.execute(
+            "SELECT post_date, chat_id, message_id, last_update_hour FROM digest LIMIT 1"
+        ).fetchone()
+    return tuple(row) if row else None
+
+
+def save_digest_state(post_date: str, chat_id: int, message_id: int, last_update_hour: int) -> None:
+    """Persist the active digest (only one is ever tracked at a time)."""
+    with closing(_connect()) as conn, conn:
+        conn.execute("DELETE FROM digest")
+        conn.execute(
+            "INSERT INTO digest (post_date, chat_id, message_id, last_update_hour)"
+            " VALUES (?, ?, ?, ?)",
+            (post_date, chat_id, message_id, last_update_hour),
+        )
+
+
+def clear_digest_state() -> None:
+    """Forget the active digest (after it has been deleted from the chat)."""
+    with closing(_connect()) as conn, conn:
+        conn.execute("DELETE FROM digest")
 
 
 def insert_occupancy(ts: datetime, people: int) -> None:
@@ -44,6 +80,49 @@ def iter_rows() -> list[str]:
     with closing(_connect()) as conn, conn:
         rows = conn.execute("SELECT ts, people FROM occupancy ORDER BY ts").fetchall()
     return [f"{ts} - {people}" for ts, people in rows]
+
+
+def fetch_occupancy() -> list[tuple[datetime, int]]:
+    """Return all occupancy samples as ``(datetime, people)`` tuples, oldest first."""
+    with closing(_connect()) as conn, conn:
+        rows = conn.execute("SELECT ts, people FROM occupancy ORDER BY ts").fetchall()
+    return [(datetime.strptime(ts, _TS_FORMAT), people) for ts, people in rows]
+
+
+def upsert_weather(
+    rows: list[tuple[datetime, float | None, float | None, float | None, float | None]],
+) -> None:
+    """Insert/overwrite hourly weather rows keyed by their floored-to-hour timestamp."""
+    with closing(_connect()) as conn, conn:
+        conn.executemany(
+            "INSERT INTO weather (ts, temp, precip, cloud, wind) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(ts) DO UPDATE SET"
+            " temp=excluded.temp, precip=excluded.precip,"
+            " cloud=excluded.cloud, wind=excluded.wind",
+            [
+                (ts.replace(minute=0, second=0, microsecond=0).strftime(_TS_FORMAT), t, p, c, w)
+                for ts, t, p, c, w in rows
+            ],
+        )
+
+
+def fetch_weather(
+    start: datetime, end: datetime
+) -> dict[datetime, tuple[float | None, float | None, float | None, float | None]]:
+    """Return ``{hour_datetime: (temp, precip, cloud, wind)}`` within ``[start, end]``."""
+    with closing(_connect()) as conn, conn:
+        rows = conn.execute(
+            "SELECT ts, temp, precip, cloud, wind FROM weather WHERE ts BETWEEN ? AND ?",
+            (start.strftime(_TS_FORMAT), end.strftime(_TS_FORMAT)),
+        ).fetchall()
+    return {datetime.strptime(ts, _TS_FORMAT): (t, p, c, w) for ts, t, p, c, w in rows}
+
+
+def max_weather_ts() -> datetime | None:
+    """Return the latest weather timestamp, or ``None`` if the table is empty."""
+    with closing(_connect()) as conn, conn:
+        row = conn.execute("SELECT MAX(ts) FROM weather").fetchone()
+    return datetime.strptime(row[0], _TS_FORMAT) if row and row[0] else None
 
 
 def export_text() -> bytes:

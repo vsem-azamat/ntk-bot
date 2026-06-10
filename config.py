@@ -37,7 +37,6 @@ class Config:
 
     ID_NTK_BIG_CHAT: int = -1001684546093
     ID_NTK_SMALL_CHAT: int = -1001384533622
-    ID_NTK_CHANNEL: int = -1001918057675
     SUPER_ADMINS: list[int] = [
         int(id_admin)
         for id_admin in config("SUPER_ADMINS", cast=str, default="").split(",")
@@ -56,6 +55,12 @@ class Config:
 
     # >>>>>>>>>> PARSERS <<<<<<<<<< #
     DELTA_TIME_FOR_RECIEVE_NTK: int = config("DELTA_TIME", cast=int, default=20)
+
+    # >>>>>>>>>> MORNING DIGEST <<<<<<<<<< #
+    # A single daily message (occupancy forecast) posted at 06:45, refreshed
+    # hourly, and deleted at 16:00. Off by default so it never posts unattended.
+    DIGEST_ENABLED: bool = config("DIGEST_ENABLED", cast=bool, default=False)
+    DIGEST_CHAT_ID: int = config("DIGEST_CHAT_ID", cast=int, default=ID_NTK_BIG_CHAT)
 
     # >>>>>>>>>> OPENROUTER <<<<<<<<<< #
     OPENROUTER_API_KEY: str = config("OPENROUTER_API_KEY", cast=str, default="")

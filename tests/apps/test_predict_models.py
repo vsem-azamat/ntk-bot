@@ -1,45 +1,24 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from apps.predictModels import (
-    extract_features,
-    model_filename,
-    parse_row_datetime,
-    predictModels,
-)
+from apps.predictModels import drop_closed_hours, time_split
 
 
-def test_model_filename_has_no_parens():
-    assert model_filename("RandomForestRegressor") == "model_RandomForestRegressor.pkl"
-
-
-def test_parse_row_datetime():
-    assert parse_row_datetime("2024-03-01 09:30 - 42") == datetime(2024, 3, 1, 9, 30)
-
-
-def test_extract_features_shape_and_values():
-    feats = extract_features([datetime(2024, 3, 1, 9, 30)])
-    # day_of_year, weekday, total_minutes, month
-    assert feats.shape == (1, 4)
-    assert feats[0].tolist() == [61, 4, 570, 3]
-
-
-def test_model_filename_honors_data_dir(monkeypatch):
-    from apps import predictModels
-
-    monkeypatch.setattr(predictModels.cnfg, "DATA_DIR", "/data")
-    assert (
-        predictModels.model_filename("RandomForestRegressor")
-        == "/data/model_RandomForestRegressor.pkl"
-    )
-
-
-async def test_remove_zero_values_skips_zero_and_malformed_lines():
-    data = [
-        "2024-03-01 09:30 - 42",
-        "2024-03-01 09:50 - 0",  # zero -> dropped
-        "",  # blank -> skipped, no IndexError
-        "garbage line without separator",  # malformed -> skipped
-        "2024-03-01 10:10 - 7",
+def test_drop_closed_hours_removes_zero_counts():
+    rows = [
+        (datetime(2024, 3, 1, 9, 0), 42),
+        (datetime(2024, 3, 1, 9, 20), 0),  # closed -> dropped
+        (datetime(2024, 3, 1, 10, 10), 7),
     ]
-    result = await predictModels.remove_zero_values(data)
-    assert result == ["2024-03-01 09:30 - 42", "2024-03-01 10:10 - 7"]
+    assert drop_closed_hours(rows) == [
+        (datetime(2024, 3, 1, 9, 0), 42),
+        (datetime(2024, 3, 1, 10, 10), 7),
+    ]
+
+
+def test_time_split_has_no_leakage():
+    base = datetime(2024, 1, 1, 9, 0)
+    rows = [(base + timedelta(days=i), i) for i in range(60)]
+    train, val = time_split(rows, holdout_weeks=4)
+
+    assert train and val
+    assert max(dt for dt, _ in train) < min(dt for dt, _ in val)

@@ -1,28 +1,45 @@
 from datetime import datetime, timedelta
-from pathlib import Path
 
-import joblib
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from scipy.interpolate import splev, splrep
 
-from apps.collect_time import generate_datetime_list
-from apps.predictModels import (
-    extract_features,
-    model_filename,
-    parse_row_datetime,
-    predictModels,
+from apps.predictModels import predictModels
+
+# Minimal "clean" palette — one ink tone, one accent, muted secondary text.
+_INK = "#111827"  # real data line
+_ACCENT = "#2563EB"  # prediction
+_MUTED = "#9CA3AF"  # ticks / secondary text
+_GRID = "#ECECEC"
+
+_RU_WEEKDAYS = (
+    "понедельник",
+    "вторник",
+    "среда",
+    "четверг",
+    "пятница",
+    "суббота",
+    "воскресенье",
+)
+_RU_MONTHS = (
+    "янв",
+    "фев",
+    "мар",
+    "апр",
+    "мая",
+    "июн",
+    "июл",
+    "авг",
+    "сен",
+    "окт",
+    "ноя",
+    "дек",
 )
 
-# Colour used to draw each model's prediction line.
-MODEL_COLORS = {
-    "GradientBoostingRegressor": "red",
-    "RandomForestRegressor": "darkgreen",
-}
-DEFAULT_MODEL = "GradientBoostingRegressor"
+
+def _ru_date(dt: datetime) -> str:
+    return f"{_RU_WEEKDAYS[dt.weekday()]}, {dt.day} {_RU_MONTHS[dt.month - 1]}"
 
 
 class PlotGraphs:
@@ -30,123 +47,88 @@ class PlotGraphs:
         self, start_datetime: datetime, end_datetime: datetime
     ) -> tuple[list[datetime], list[int]]:
         """Get occupancy data from SQLite within the given datetime range."""
-        from bot import db  # local import to avoid circular dependency
+        from bot import db
 
         datetimes: list[datetime] = []
         quantities: list[int] = []
-        data = await predictModels.remove_zero_values(db.iter_rows())
-        for row in data:
-            row_datetime = parse_row_datetime(row)
-            if start_datetime <= row_datetime <= end_datetime:
-                quantities.append(int(row.split(" - ")[1].strip()))
+        for row_datetime, count in db.fetch_occupancy():
+            if count != 0 and start_datetime <= row_datetime <= end_datetime:
                 datetimes.append(row_datetime)
+                quantities.append(count)
         return datetimes, quantities
-
-    async def daily_graph(
-        self, target_day: datetime | None = None
-    ) -> tuple[Figure, Axes, datetime, datetime]:
-        hours_delta = 18
-        target_day = target_day or datetime.now()
-        start_datetime = target_day.replace(hour=10 if target_day.isoweekday() >= 6 else 8).replace(
-            minute=0, second=0, microsecond=0
-        )
-        end_datetime = start_datetime + timedelta(hours=hours_delta)
-
-        # get data
-        x_times, y_quantities = await self.get_ntk_data(start_datetime, end_datetime)
-
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.set_yticks(range(0, 1100, 100))
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-
-        ax.plot(
-            x_times, y_quantities, linestyle="-", color="black", linewidth=2.5, label="Real data"
-        )
-
-        # annotation settings
-        ax.legend(loc="upper right")
-        ax.set_xlabel("time")
-        ax.set_ylabel("people")
-        ax.set_title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
-        ax.grid(True, linewidth=0.3, which="both", axis="both")
-
-        # Add annotation for max value
-        if y_quantities:
-            y_max = max(y_quantities)
-            x_max = x_times[y_quantities.index(y_max)]
-            ax.annotate(
-                f"Max: {y_max}",
-                xy=(x_max, y_max),
-                xytext=(x_max, y_max * 0.9),
-                bbox=dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9),
-                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.2", color="black"),
-            )
-
-        ax.set_xlim(start_datetime - timedelta(minutes=30), end_datetime + timedelta(minutes=30))
-        plt.xticks(rotation=45)
-
-        return fig, ax, start_datetime, end_datetime
-
-    async def add_daily_prediction(
-        self,
-        fig: Figure,
-        ax: Axes,
-        start_datetime: datetime,
-        end_datetime: datetime,
-        model_name: str | None = None,
-    ) -> tuple[Figure, Axes, datetime, datetime]:
-        x_datetime = await generate_datetime_list(start_datetime, end_datetime, delta_minutes=10)
-
-        if model_name not in MODEL_COLORS:
-            model_name = DEFAULT_MODEL
-        color = MODEL_COLORS[model_name]
-
-        # The model may not have been trained yet (e.g. too little data); skip its line.
-        model_path = model_filename(model_name)
-        if not Path(model_path).exists():
-            return fig, ax, start_datetime, end_datetime
-        model = joblib.load(model_path)
-
-        xPredict = extract_features(x_datetime)
-        y = list(map(int, model.predict(xPredict)))
-        ax = fig.axes[0]
-
-        # Interpolate data for smooth line
-        x_numeric = np.array([dt.timestamp() for dt in x_datetime])
-        x_interp_numeric = np.linspace(min(x_numeric), max(x_numeric), num=100)
-        x_interp_datetime = [datetime.fromtimestamp(ts) for ts in x_interp_numeric]
-
-        tck = splrep(x_numeric, y)
-        y_interp = splev(x_interp_numeric, tck)
-
-        ax.plot(
-            x_interp_datetime,
-            y_interp,
-            linestyle="-",
-            color=color,
-            linewidth=1,
-            label=model_name,
-            zorder=0,
-            alpha=0.5,
-        )
-        ax.legend()
-
-        return fig, ax, start_datetime, end_datetime
 
     async def daily_graph_with_predictions(
         self, target_day: datetime | None = None
     ) -> tuple[Figure, Axes]:
+        """Minimal occupancy chart: real data + prediction median + p10–p90 band."""
         target_day = target_day or datetime.now()
-        fig, ax, start_datetime, end_datetime = await self.daily_graph(target_day)
-        for model_name in MODEL_COLORS:
-            await self.add_daily_prediction(
-                fig=fig,
-                ax=ax,
-                start_datetime=start_datetime,
-                end_datetime=end_datetime,
-                model_name=model_name,
+        start = target_day.replace(
+            hour=10 if target_day.isoweekday() >= 6 else 8,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        end = start + timedelta(hours=18)
+
+        x_times, y_quantities = await self.get_ntk_data(start, end)
+        forecast = await predictModels.predict_day(target_day)
+
+        fig, ax = plt.subplots(figsize=(10, 5.4))
+        fig.patch.set_facecolor("white")
+        ax.set_facecolor("white")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.grid(True, axis="y", color=_GRID, linewidth=1.0)
+        ax.set_axisbelow(True)
+        ax.tick_params(length=0, colors=_MUTED, labelsize=9)
+        ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+
+        # Forecast: soft p10–p90 band + median line.
+        ax.fill_between(
+            forecast.timestamps,
+            forecast.p10,
+            forecast.p90,
+            color=_ACCENT,
+            alpha=0.10,
+            linewidth=0,
+            zorder=1,
+        )
+        ax.plot(
+            forecast.timestamps,
+            forecast.p50,
+            color=_ACCENT,
+            linewidth=2.0,
+            label="прогноз",
+            zorder=2,
+        )
+        # Real data so far.
+        ax.plot(
+            x_times,
+            y_quantities,
+            color=_INK,
+            linewidth=2.2,
+            solid_capstyle="round",
+            label="сейчас",
+            zorder=3,
+        )
+        # Tag the latest real value at the tip of the line.
+        if y_quantities:
+            ax.annotate(
+                f" {y_quantities[-1]}",
+                (x_times[-1], y_quantities[-1]),
+                color=_INK,
+                fontsize=11,
+                fontweight="bold",
+                va="center",
+                zorder=4,
             )
+
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(start, end)
+        ax.set_title(f"НТК · {_ru_date(start)}", loc="left", color=_INK, fontsize=13, pad=12)
+        ax.legend(loc="upper left", frameon=False, fontsize=10, labelcolor=_MUTED, handlelength=1.3)
+        fig.tight_layout()
         return fig, ax
 
 

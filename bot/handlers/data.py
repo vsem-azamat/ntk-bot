@@ -5,7 +5,6 @@ from aiogram.filters import Command
 
 from apps.plot_functions import plotGraph
 from apps.predictModels import predictModels
-from apps.weather_api import weatherAPI
 from bot import db
 from bot.filters import NTKChatFilter, SuperAdmins
 
@@ -14,7 +13,7 @@ router = Router()
 
 @router.message(Command("graph"), NTKChatFilter())
 async def send_stats(message: types.Message, bot: Bot):
-    """Send graph with NTK visits prediction and weather forecast"""
+    """Send the occupancy graph: real data, predicted median and the p10–p90 range."""
     fig_visits, _ = await plotGraph.daily_graph_with_predictions()
 
     buffer_visits = io.BytesIO()
@@ -26,25 +25,6 @@ async def send_stats(message: types.Message, bot: Bot):
         photo=types.BufferedInputFile(
             file=buffer_visits.read(),
             filename="visits.png",
-        ),
-    )
-    await message.delete()
-
-
-@router.message(Command("weather"), SuperAdmins())
-async def send_weather(message: types.Message, bot: Bot):
-    """Send weather forecast"""
-    fig_weather, _, _ = await weatherAPI.plot_daily_weather_forecast()
-
-    buffer_weather = io.BytesIO()
-    fig_weather.savefig(buffer_weather, format="png")
-    buffer_weather.seek(0)
-
-    await bot.send_photo(
-        chat_id=message.chat.id,
-        photo=types.BufferedInputFile(
-            file=buffer_weather.read(),
-            filename="weather.png",
         ),
     )
     await message.delete()

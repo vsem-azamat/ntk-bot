@@ -5,6 +5,7 @@ from pathlib import Path
 
 from apps.collect_time import generate_time_list
 from apps.parse_functions import get_ntk_quantity
+from apps.weather_history import backfill
 from config import cnfg
 
 logger = logging.getLogger(__name__)
@@ -47,3 +48,93 @@ async def receive_ntk_data(delta_minutes: int = 20) -> None:
             await asyncio.sleep(delta_minutes * 60 - 60)
         else:
             await asyncio.sleep(1)
+
+
+async def daily_maintenance_loop(interval_seconds: float = 24 * 60 * 60) -> None:
+    """Once a day: refresh weather, then retrain models.
+
+    Retraining runs on the first tick only for a cold start (no model yet); a
+    plain restart does not trigger an expensive retrain. Subsequent daily ticks
+    always retrain so the model tracks fresh data.
+    """
+    from apps.predictModels import predictModels
+
+    first = True
+    while True:
+        try:
+            written = await backfill()
+            logger.info("Weather backfill wrote %d rows", written)
+        except Exception:
+            logger.exception("Weather backfill failed")
+
+        if not first or not predictModels.has_trained():
+            try:
+                await predictModels.learn_models()
+                logger.info("Models retrained")
+            except Exception:
+                logger.exception("Model retrain failed")
+        first = False
+
+        await asyncio.sleep(interval_seconds)
+
+
+async def morning_digest_loop(bot, interval_seconds: float = 60) -> None:
+    """Post / refresh / delete the daily occupancy digest.
+
+    Time-driven and restart-safe: state lives in SQLite, so every tick simply
+    re-derives the right action from the clock. No-op unless DIGEST_ENABLED.
+    """
+    if not cnfg.DIGEST_ENABLED:
+        logger.info("Morning digest disabled (DIGEST_ENABLED is off)")
+        return
+
+    from datetime import date
+
+    from aiogram.types import BufferedInputFile, InputMediaPhoto
+
+    from apps.digest import DigestAction, DigestState, decide_digest_action, render
+    from bot import db
+
+    while True:
+        try:
+            now = datetime.now()
+            row = db.get_digest_state()
+            state = DigestState(date.fromisoformat(row[0]), row[1], row[2], row[3]) if row else None
+            action = decide_digest_action(now, state)
+
+            if action is DigestAction.POST:
+                image, caption = await render(now)
+                message = await bot.send_photo(
+                    cnfg.DIGEST_CHAT_ID,
+                    BufferedInputFile(image, "ntk.png"),
+                    caption=caption,
+                )
+                db.save_digest_state(
+                    now.date().isoformat(), cnfg.DIGEST_CHAT_ID, message.message_id, now.hour
+                )
+            elif action is DigestAction.UPDATE and state is not None:
+                image, caption = await render(now)
+                try:
+                    await bot.edit_message_media(
+                        chat_id=state.chat_id,
+                        message_id=state.message_id,
+                        media=InputMediaPhoto(
+                            media=BufferedInputFile(image, "ntk.png"), caption=caption
+                        ),
+                    )
+                    db.save_digest_state(
+                        state.post_date.isoformat(), state.chat_id, state.message_id, now.hour
+                    )
+                except Exception:
+                    logger.exception("Digest update failed; forgetting the message")
+                    db.clear_digest_state()
+            elif action is DigestAction.DELETE and state is not None:
+                try:
+                    await bot.delete_message(state.chat_id, state.message_id)
+                except Exception:
+                    logger.exception("Digest delete failed; forgetting the message anyway")
+                finally:
+                    db.clear_digest_state()
+        except Exception:
+            logger.exception("Morning digest tick failed")
+        await asyncio.sleep(interval_seconds)

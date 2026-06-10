@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Build image and deploy to azamat VPS
+    name: Build image and deploy
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -29,13 +29,15 @@ jobs:
       SSH_HOST: ${{ secrets.DEMO_SSH_HOST }}
       SSH_USER: ${{ secrets.DEMO_SSH_USER }}
       SSH_PORT: ${{ secrets.DEMO_SSH_PORT || '22' }}
-      DEPLOY_DIR: ${{ secrets.NTK_DEPLOY_DIR || '/home/azamat/deploy/ntk-bot' }}
+      DEPLOY_DIR: ${{ secrets.NTK_DEPLOY_DIR }}
       BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       SUPER_ADMINS: ${{ secrets.SUPER_ADMINS }}
       DELTA_TIME: ${{ secrets.DELTA_TIME || '20' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-4o' }}
       ANSWER_PROBABILITY: ${{ secrets.ANSWER_PROBABILITY || '0.025' }}
+      DIGEST_ENABLED: ${{ secrets.DIGEST_ENABLED || 'false' }}
+      DIGEST_CHAT_ID: ${{ secrets.DIGEST_CHAT_ID }}
     steps:
       - name: Checkout workflow run SHA
         if: github.event_name == 'workflow_run'
@@ -56,6 +58,7 @@ jobs:
           [ -z "$SSH_HOST" ] && missing="$missing DEMO_SSH_HOST"
           [ -z "$SSH_USER" ] && missing="$missing DEMO_SSH_USER"
           [ "$SSH_KEY_PRESENT" != "true" ] && missing="$missing DEMO_SSH_KEY"
+          [ -z "$DEPLOY_DIR" ] && missing="$missing NTK_DEPLOY_DIR"
           [ -z "$BOT_TOKEN" ] && missing="$missing BOT_TOKEN"
           if [ -n "$missing" ]; then
             echo "::error::Missing required deployment secrets:$missing"
@@ -65,10 +68,10 @@ jobs:
       - name: Validate deploy target
         run: |
           set -euo pipefail
-          if [ "$DEPLOY_DIR" != "/home/azamat/deploy/ntk-bot" ]; then
-            echo "::error::DEPLOY_DIR must be /home/azamat/deploy/ntk-bot"
-            exit 1
-          fi
+          case "$DEPLOY_DIR" in
+            /*) ;;
+            *) echo "::error::NTK_DEPLOY_DIR must be an absolute path"; exit 1 ;;
+          esac
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -143,6 +146,8 @@ jobs:
             echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
             echo "OPENROUTER_MODEL=${OPENROUTER_MODEL}"
             echo "ANSWER_PROBABILITY=${ANSWER_PROBABILITY}"
+            echo "DIGEST_ENABLED=${DIGEST_ENABLED}"
+            [ -n "$DIGEST_CHAT_ID" ] && echo "DIGEST_CHAT_ID=${DIGEST_CHAT_ID}"
             echo "DATA_DIR=/data"
           } > "$tmp_env"
           rsync -az --chmod=F600 \

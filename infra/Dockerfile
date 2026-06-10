@@ -14,9 +14,15 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app \
     MPLBACKEND=Agg \
     PYTHONUNBUFFERED=1 \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    TZ=Europe/Prague
 WORKDIR /app
-RUN useradd -m -u 10001 bot && mkdir -p /data && chown bot:bot /data
+# tzdata + TZ make datetime.now() local to Prague (CEST), matching the legacy
+# server's timezone so collected timestamps stay continuous with history.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 10001 bot && mkdir -p /data && chown bot:bot /data
 COPY --from=builder --chown=bot:bot /app /app
 USER bot
 VOLUME ["/data"]

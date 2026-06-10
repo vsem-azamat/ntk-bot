@@ -8,4 +8,4 @@ def run() -> None:
     asyncio.run(main())
 
 
-__all__ = ["main", "run"]
+__all__ = ["run"]
