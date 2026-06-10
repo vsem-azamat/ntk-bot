@@ -20,7 +20,6 @@ class NTKChatFilter(BaseFilter):
         return message.chat.id in [
             cnfg.ID_NTK_BIG_CHAT,
             cnfg.ID_NTK_SMALL_CHAT,
-            cnfg.ID_NTK_CHANNEL,
         ]
 
 

@@ -37,7 +37,6 @@ class Config:
 
     ID_NTK_BIG_CHAT: int = -1001684546093
     ID_NTK_SMALL_CHAT: int = -1001384533622
-    ID_NTK_CHANNEL: int = -1001918057675
     SUPER_ADMINS: list[int] = [
         int(id_admin)
         for id_admin in config("SUPER_ADMINS", cast=str, default="").split(",")
