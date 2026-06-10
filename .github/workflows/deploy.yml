@@ -36,6 +36,8 @@ jobs:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-4o' }}
       ANSWER_PROBABILITY: ${{ secrets.ANSWER_PROBABILITY || '0.025' }}
+      DIGEST_ENABLED: ${{ secrets.DIGEST_ENABLED || 'false' }}
+      DIGEST_CHAT_ID: ${{ secrets.DIGEST_CHAT_ID }}
     steps:
       - name: Checkout workflow run SHA
         if: github.event_name == 'workflow_run'
@@ -144,6 +146,8 @@ jobs:
             echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
             echo "OPENROUTER_MODEL=${OPENROUTER_MODEL}"
             echo "ANSWER_PROBABILITY=${ANSWER_PROBABILITY}"
+            echo "DIGEST_ENABLED=${DIGEST_ENABLED}"
+            [ -n "$DIGEST_CHAT_ID" ] && echo "DIGEST_CHAT_ID=${DIGEST_CHAT_ID}"
             echo "DATA_DIR=/data"
           } > "$tmp_env"
           rsync -az --chmod=F600 \
