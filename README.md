@@ -1,102 +1,77 @@
 # NTK bot
-Telegram bot in @chat_ntk chat for students who regularly visit the National Technical Library. The bot regularly collects statistics on library visits. Based on this data, machine learning models predict the expected occupancy of the library — together with an uncertainty range, not just a single number.
 
+Telegram bot for [@chat_ntk](https://t.me/chat_ntk) — students of the National Technical Library in Prague. It tracks how busy the library is in real time and predicts the occupancy for the rest of the day, with an uncertainty range rather than a single number.
 
 <p align="center">
   <img src="example_images/daily_graph_with_predictions.jpg" alt="NTK occupancy with prediction" width="80%">
 </p>
 
+## Features
 
-## Current and planned functions:
-- [x] Shows the current number of people in the NTK
-- [x] Regular storage of data from the library website on the number of people
-- [x] Draws a diagram of people's visits in the NTK
-- [x] Predicting the number of people in the library (median + p10–p90 range) with ML models
-- [x] Uses weather as an input signal for the prediction
-- [ ] Anti-bot filter
-- [ ] Function for temporary self mute/ban from the chat so that students are not distracted from their studies
+- Shows the current number of people in the library (`/ntk`)
+- Continuously records occupancy from the library website into SQLite
+- Plots the day: real data so far + predicted median + p10–p90 range (`/graph`)
+- Predicts occupancy with ML models that also use weather as a signal
 
-## Data sources:
-- [NTK website](https://www.techlib.cz/)
-- [Open-Meteo](https://open-meteo.com/)
+**Planned:** morning digest (auto-updating, self-deleting), anti-bot filter.
 
+## How prediction works
 
-## How prediction works:
 Every occupancy sample is stored permanently. For each timestamp the model builds a feature vector and predicts the number of people:
 
 | feature group | features |
 |:---|:---|
 | time (cyclical) | minute-of-day (sin/cos), day-of-year (sin/cos) |
 | calendar | weekday, month, weekend flag |
-| weather | temperature, precipitation, cloud cover, wind (joined by hour) |
+| weather | temperature, precipitation, cloud cover, wind |
 
-Instead of a single number, three **quantile** models are trained, so the bot shows a range rather than just a point estimate:
+Instead of a single number, three **quantile** models are trained, so the bot shows a range rather than a point estimate:
+
 - **p50** — the median ("usually about this many people")
 - **p10 / p90** — the central 80% range ("normally somewhere between these")
 
-The models are [CatBoost](https://catboost.ai/) gradient-boosted regressors (`loss=Quantile`). They are validated on a **time-based holdout** (the most recent weeks, never shuffled — so past predictions can't leak future data) and benchmarked against a simple **climatology baseline** (historical median per weekday × time-of-day). CatBoost ships only when it beats the baseline; otherwise — and on a cold start — the bot falls back to the baseline.
+The models are [CatBoost](https://catboost.ai/) regressors (`loss=Quantile`), validated on a **time-based holdout** (the most recent weeks, never shuffled — so the past can't leak future data) and benchmarked against a **climatology baseline** (historical median per weekday × time-of-day). CatBoost ships only when it beats the baseline; otherwise — and on a cold start — the bot falls back to the baseline.
 
-Historical weather is backfilled once from the Open-Meteo archive and kept current daily; the forecast for the target day feeds the prediction.
+Historical weather is backfilled once from [Open-Meteo](https://open-meteo.com/) and refreshed daily; the forecast for the target day feeds the prediction.
 
-## Installation and start
+## Run locally
 
 The project is managed with [uv](https://docs.astral.sh/uv/).
 
-### Necessary:
-Install dependencies (creates a virtual environment from `uv.lock`)
 ```sh
-> uv sync
-```
-Create a `.env` file and add the **bot token**
-```env
-BOT_TOKEN=<TOKEN>
+uv sync                 # install deps from uv.lock
+echo "BOT_TOKEN=<token>" > .env
+uv run ntk-bot          # or: uv run python -m bot
 ```
 
-### Start:
-From the root directory of the project
+Data is written to `./ntk.sqlite` (override the directory with `DATA_DIR`).
+
+### Optional `.env` values
+
+| key | default | meaning |
+|:---|:---|:---|
+| `DELTA_TIME` | `20` | minutes between occupancy samples |
+| `SUPER_ADMINS` | — | comma-separated admin user IDs |
+| `OPENROUTER_API_KEY` | — | [OpenRouter](https://openrouter.ai/) key for random GPT replies |
+| `OPENROUTER_MODEL` | `openai/gpt-4o` | model slug for OpenRouter |
+| `ANSWER_PROBABILITY` | `0.025` | chance of a random GPT reply |
+
+### Development
+
 ```sh
-> uv run ntk-bot
-```
-(equivalently `uv run python -m bot`)
-
-### Optional:
-Additional adjustable values in `.env`
-```env
-DELTA_TIME=<int>
-SUPER_ADMINS=<int,int,int,...>
-OPENROUTER_API_KEY=<KEY>
-OPENROUTER_MODEL=<slug>
-ANSWER_PROBABILITY=<float>
-```
-* `DELTA_TIME` - The time interval with which the bot collects visit data from the site. The default value is `20`
-* `SUPER_ADMINS` - List of super admins for admin commands
-* `OPENROUTER_API_KEY` - [OpenRouter](https://openrouter.ai/) key used for the random GPT replies
-* `OPENROUTER_MODEL` - Model slug passed to OpenRouter. Default `openai/gpt-4o`
-* `ANSWER_PROBABILITY` - Probability of a random GPT reply. Default `0.025`
-
-### Development:
-```sh
-> uv run ruff format .      # format
-> uv run ruff check .       # lint
-> uv run ty check           # type-check
-> uv run pytest             # tests
+uv run ruff format .    # format
+uv run ruff check .     # lint
+uv run ty check         # type-check
+uv run pytest           # tests
 ```
 
+## Commands
 
-## Commands:
-Prefixes: `!/`
-- `/ntk` - Show the current number of people in the library
-- `/help` - Show help
-- `/graph` - Draw and send the occupancy graph: real data, the predicted median and the p10–p90 range
-- `/learn` - Re-train the CatBoost prediction models on the stored data
+- `/ntk` — current number of people in the library
+- `/graph` — occupancy chart: real data, predicted median and the p10–p90 range
+- `/learn` — re-train the prediction models on stored data *(admin)*
+- `/data` — export the occupancy series as text *(admin)*
 
 ## Deployment
 
-Production runs on the `azamat` VPS as a Docker Compose stack, delivered by
-GitHub Actions (build → GHCR → SSH deploy). Occupancy data lives in SQLite on a
-persistent volume (`/data/ntk.sqlite`). See
-[`docs/deployment/prod.md`](docs/deployment/prod.md) for the runbook and the
-one-time cutover from the legacy manual deployment.
-
-Local dev still uses `uv run ntk-bot` with a `.env`; data is written to
-`./ntk.sqlite` (overridable with `DATA_DIR`).
+Production runs on the `azamat` VPS as a Docker Compose stack, delivered by GitHub Actions (build → GHCR → SSH deploy). Occupancy data lives in SQLite on a persistent volume (`/data/ntk.sqlite`). See [`docs/deployment/prod.md`](docs/deployment/prod.md) for the runbook.
