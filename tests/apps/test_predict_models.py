@@ -6,7 +6,7 @@ from apps.predictModels import drop_closed_hours, time_split
 def test_drop_closed_hours_removes_zero_counts():
     rows = [
         (datetime(2024, 3, 1, 9, 0), 42),
-        (datetime(2024, 3, 1, 9, 20), 0),   # closed -> dropped
+        (datetime(2024, 3, 1, 9, 20), 0),  # closed -> dropped
         (datetime(2024, 3, 1, 10, 10), 7),
     ]
     assert drop_closed_hours(rows) == [

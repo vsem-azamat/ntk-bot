@@ -176,7 +176,10 @@ class PredictModels:
             clim = build_climatology(drop_closed_hours(db.fetch_occupancy()))
             p10, p50, p90 = climatology_predict(clim, grid)
 
-        bands = [sorted((max(0.0, a), max(0.0, b), max(0.0, c))) for a, b, c in zip(p10, p50, p90, strict=True)]
+        bands = [
+            sorted((max(0.0, a), max(0.0, b), max(0.0, c)))
+            for a, b, c in zip(p10, p50, p90, strict=True)
+        ]
         return DayForecast(
             timestamps=grid,
             p10=[b[0] for b in bands],

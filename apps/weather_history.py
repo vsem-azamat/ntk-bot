@@ -32,7 +32,9 @@ def _num(v) -> float | None:
     return None if v is None else float(v)
 
 
-def _payload_to_rows(payload: dict) -> list[tuple[datetime, float | None, float | None, float | None, float | None]]:
+def _payload_to_rows(
+    payload: dict,
+) -> list[tuple[datetime, float | None, float | None, float | None, float | None]]:
     hourly = payload.get("hourly", {})
     times = hourly.get("time", [])
     return [

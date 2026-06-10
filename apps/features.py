@@ -13,9 +13,17 @@ from datetime import datetime
 import numpy as np
 
 FEATURE_NAMES = [
-    "minute_sin", "minute_cos", "is_weekend",
-    "yday_sin", "yday_cos", "weekday", "month",
-    "temp", "precip", "cloud", "wind",
+    "minute_sin",
+    "minute_cos",
+    "is_weekend",
+    "yday_sin",
+    "yday_cos",
+    "weekday",
+    "month",
+    "temp",
+    "precip",
+    "cloud",
+    "wind",
 ]
 CATEGORICAL_INDICES = [5, 6]
 

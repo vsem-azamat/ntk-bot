@@ -6,9 +6,7 @@ import numpy as np
 from config import cnfg
 
 
-async def test_predict_day_falls_back_to_baseline_and_returns_monotone_band(
-    tmp_path, monkeypatch
-):
+async def test_predict_day_falls_back_to_baseline_and_returns_monotone_band(tmp_path, monkeypatch):
     monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
     from bot import db
@@ -69,8 +67,9 @@ async def test_predict_day_catboost_branch_returns_monotone_band(tmp_path, monke
     db.init_db()
     _seed_pattern(db)
     occ = db.fetch_occupancy()
-    predictModels._fit_and_save(build_features([dt for dt, _ in occ], {}),
-                                np.array([c for _, c in occ], dtype=float))
+    predictModels._fit_and_save(
+        build_features([dt for dt, _ in occ], {}), np.array([c for _, c in occ], dtype=float)
+    )
     predictModels._write_choice("catboost")  # force the catboost branch
 
     import apps.weather_history as wh

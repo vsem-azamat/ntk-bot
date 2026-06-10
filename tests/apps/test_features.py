@@ -1,14 +1,22 @@
 import math
 from datetime import datetime
 
-from apps.features import CATEGORICAL_INDICES, FEATURE_NAMES, build_features
+from apps.features import CATEGORICAL_INDICES, FEATURE_NAMES, WeatherRow, build_features
 
 
 def test_feature_names_and_categorical_indices():
     assert FEATURE_NAMES == [
-        "minute_sin", "minute_cos", "is_weekend",
-        "yday_sin", "yday_cos", "weekday", "month",
-        "temp", "precip", "cloud", "wind",
+        "minute_sin",
+        "minute_cos",
+        "is_weekend",
+        "yday_sin",
+        "yday_cos",
+        "weekday",
+        "month",
+        "temp",
+        "precip",
+        "cloud",
+        "wind",
     ]
     assert CATEGORICAL_INDICES == [5, 6]
 
@@ -24,8 +32,8 @@ def test_categoricals_are_strings_and_weekend_flag():
     # 2024-03-02 is a Saturday
     feats = build_features([datetime(2024, 3, 2, 12, 0)])
     x = feats.X
-    assert x[0, 5] == "5"      # weekday: Saturday == 5
-    assert x[0, 6] == "3"      # month: March
+    assert x[0, 5] == "5"  # weekday: Saturday == 5
+    assert x[0, 6] == "3"  # month: March
     assert float(x[0, 2]) == 1.0  # is_weekend
 
 
@@ -43,7 +51,7 @@ def test_cyclical_yday_encoding_wraps_around():
 
 def test_weather_join_fills_matching_hour_and_nans_when_missing():
     ts = datetime(2024, 3, 1, 9, 30)
-    weather = {datetime(2024, 3, 1, 9, 0): (5.0, 0.0, 50.0, 3.0)}
+    weather: dict[datetime, WeatherRow] = {datetime(2024, 3, 1, 9, 0): (5.0, 0.0, 50.0, 3.0)}
     x = build_features([ts], weather).X
     assert [float(v) for v in x[0, 7:11]] == [5.0, 0.0, 50.0, 3.0]
 
