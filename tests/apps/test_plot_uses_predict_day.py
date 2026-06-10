@@ -19,7 +19,8 @@ async def test_daily_graph_with_predictions_draws_predicted_median(monkeypatch):
     fig, ax = await pf.plotGraph.daily_graph_with_predictions(datetime(2024, 3, 1, 12, 0))
 
     labels = [line.get_label() for line in ax.get_lines()]
-    assert "Prediction" in labels
+    assert "прогноз" in labels
+    assert "сейчас" in labels
     import matplotlib.pyplot as plt
 
     plt.close(fig)

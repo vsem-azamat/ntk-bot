@@ -2,17 +2,17 @@
 Telegram bot in @chat_ntk chat for students who regularly visit the National Technical Library. The bot regularly collects statistics on library visits. Based on this data, machine learning models predict the expected occupancy of the library — together with an uncertainty range, not just a single number.
 
 
-| ![Daily graph with predictions](example_images/daily_graph_with_predictions.jpg) | ![Weather forecast](example_images/weather_forecast.jpg) |
-|:---:|:---:|
-| Daily graph with predictions | Weather forecast |
+<p align="center">
+  <img src="example_images/daily_graph_with_predictions.jpg" alt="NTK occupancy with prediction" width="80%">
+</p>
 
 
 ## Current and planned functions:
 - [x] Shows the current number of people in the NTK
 - [x] Regular storage of data from the library website on the number of people
 - [x] Draws a diagram of people's visits in the NTK
-- [x] Predicting the number of people in the library based on the received data with ML models
-- [x] Weather forecasts
+- [x] Predicting the number of people in the library (median + p10–p90 range) with ML models
+- [x] Uses weather as an input signal for the prediction
 - [ ] Anti-bot filter
 - [ ] Function for temporary self mute/ban from the chat so that students are not distracted from their studies
 
@@ -89,7 +89,6 @@ Prefixes: `!/`
 - `/help` - Show help
 - `/graph` - Draw and send the occupancy graph: real data, the predicted median and the p10–p90 range
 - `/learn` - Re-train the CatBoost prediction models on the stored data
-- `/weather` - Show weather forecast
 
 ## Deployment
 

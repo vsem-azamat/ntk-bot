@@ -7,19 +7,22 @@ from matplotlib.figure import Figure
 
 from apps.predictModels import predictModels
 
-# Palette + light "seaborn-darkgrid"-like styling, applied per-axes so it does
-# not leak into other figures (e.g. the weather plot).
-_INK = "#111111"
-_BLUE = "#2e86de"
+# Minimal "clean" palette — one ink tone, one accent, muted secondary text.
+_INK = "#111827"  # real data line
+_ACCENT = "#2563EB"  # prediction
+_MUTED = "#9CA3AF"  # ticks / secondary text
+_GRID = "#ECECEC"
+
+_RU_WEEKDAYS = (
+    "понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье",
+)
+_RU_MONTHS = (
+    "янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
+)
 
 
-def _style_axes(ax: Axes) -> None:
-    ax.set_facecolor("#EAEAF2")
-    ax.grid(True, color="white", linewidth=1.0, axis="both")
-    ax.set_axisbelow(True)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-    ax.tick_params(length=0)
+def _ru_date(dt: datetime) -> str:
+    return f"{_RU_WEEKDAYS[dt.weekday()]}, {dt.day} {_RU_MONTHS[dt.month - 1]}"
 
 
 class PlotGraphs:
@@ -37,88 +40,78 @@ class PlotGraphs:
                 quantities.append(count)
         return datetimes, quantities
 
-    async def daily_graph(
-        self, target_day: datetime | None = None
-    ) -> tuple[Figure, Axes, datetime, datetime]:
-        hours_delta = 18
-        target_day = target_day or datetime.now()
-        start_datetime = target_day.replace(hour=10 if target_day.isoweekday() >= 6 else 8).replace(
-            minute=0, second=0, microsecond=0
-        )
-        end_datetime = start_datetime + timedelta(hours=hours_delta)
-
-        # get data
-        x_times, y_quantities = await self.get_ntk_data(start_datetime, end_datetime)
-
-        fig, ax = plt.subplots(figsize=(11, 6))
-        _style_axes(ax)
-        ax.set_yticks(range(0, 1100, 100))
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-
-        ax.plot(
-            x_times,
-            y_quantities,
-            linestyle="-",
-            color=_INK,
-            linewidth=2.6,
-            solid_capstyle="round",
-            label="Real data",
-            zorder=5,
-        )
-
-        # annotation settings
-        ax.set_xlabel("time")
-        ax.set_ylabel("people")
-        ax.set_title(f"NTK: {start_datetime.strftime('%A')} {start_datetime.strftime('%d-%m-%Y')}")
-
-        # Add annotation for max value
-        if y_quantities:
-            y_max = max(y_quantities)
-            x_max = x_times[y_quantities.index(y_max)]
-            ax.annotate(
-                f"Max: {y_max}",
-                xy=(x_max, y_max),
-                xytext=(x_max, y_max * 0.9),
-                bbox=dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9),
-                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0.2", color=_INK),
-            )
-
-        ax.set_xlim(start_datetime - timedelta(minutes=30), end_datetime + timedelta(minutes=30))
-        ax.set_ylim(bottom=0)
-        plt.setp(ax.get_xticklabels(), rotation=45)
-
-        return fig, ax, start_datetime, end_datetime
-
     async def daily_graph_with_predictions(
         self, target_day: datetime | None = None
     ) -> tuple[Figure, Axes]:
+        """Minimal occupancy chart: real data + prediction median + p10–p90 band."""
         target_day = target_day or datetime.now()
-        fig, ax, _, _ = await self.daily_graph(target_day)
+        start = target_day.replace(
+            hour=10 if target_day.isoweekday() >= 6 else 8,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        end = start + timedelta(hours=18)
 
+        x_times, y_quantities = await self.get_ntk_data(start, end)
         forecast = await predictModels.predict_day(target_day)
-        # Shaded p10–p90 band = where occupancy usually lands (central 80%).
+
+        fig, ax = plt.subplots(figsize=(10, 5.4))
+        fig.patch.set_facecolor("white")
+        ax.set_facecolor("white")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        ax.grid(True, axis="y", color=_GRID, linewidth=1.0)
+        ax.set_axisbelow(True)
+        ax.tick_params(length=0, colors=_MUTED, labelsize=9)
+        ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+
+        # Forecast: soft p10–p90 band + median line.
         ax.fill_between(
             forecast.timestamps,
             forecast.p10,
             forecast.p90,
-            color=_BLUE,
-            alpha=0.16,
+            color=_ACCENT,
+            alpha=0.10,
             linewidth=0,
-            label="Usual range (p10–p90)",
             zorder=1,
         )
-        # Median forecast line.
         ax.plot(
             forecast.timestamps,
             forecast.p50,
-            linestyle="-",
-            color=_BLUE,
+            color=_ACCENT,
+            linewidth=2.0,
+            label="прогноз",
+            zorder=2,
+        )
+        # Real data so far.
+        ax.plot(
+            x_times,
+            y_quantities,
+            color=_INK,
             linewidth=2.2,
-            label="Prediction",
+            solid_capstyle="round",
+            label="сейчас",
             zorder=3,
         )
-        ax.legend(loc="upper left", framealpha=0.95)
+        # Tag the latest real value at the tip of the line.
+        if y_quantities:
+            ax.annotate(
+                f" {y_quantities[-1]}",
+                (x_times[-1], y_quantities[-1]),
+                color=_INK,
+                fontsize=11,
+                fontweight="bold",
+                va="center",
+                zorder=4,
+            )
+
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(start, end)
+        ax.set_title(f"НТК · {_ru_date(start)}", loc="left", color=_INK, fontsize=13, pad=12)
+        ax.legend(loc="upper left", frameon=False, fontsize=10, labelcolor=_MUTED, handlelength=1.3)
+        fig.tight_layout()
         return fig, ax
 
 
