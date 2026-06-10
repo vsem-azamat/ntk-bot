@@ -74,4 +74,4 @@ uv run pytest           # tests
 
 ## Deployment
 
-Production runs on the `azamat` VPS as a Docker Compose stack, delivered by GitHub Actions (build → GHCR → SSH deploy). Occupancy data lives in SQLite on a persistent volume (`/data/ntk.sqlite`). See [`docs/deployment/prod.md`](docs/deployment/prod.md) for the runbook.
+Containerised with Docker Compose and deployed via GitHub Actions. Occupancy data is persisted in SQLite on a Docker volume.
