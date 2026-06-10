@@ -108,6 +108,7 @@ async def morning_digest_loop(bot, interval_seconds: float = 60) -> None:
                     cnfg.DIGEST_CHAT_ID,
                     BufferedInputFile(image, "ntk.png"),
                     caption=caption,
+                    parse_mode="HTML",
                 )
                 db.save_digest_state(
                     now.date().isoformat(), cnfg.DIGEST_CHAT_ID, message.message_id, now.hour
@@ -119,7 +120,9 @@ async def morning_digest_loop(bot, interval_seconds: float = 60) -> None:
                         chat_id=state.chat_id,
                         message_id=state.message_id,
                         media=InputMediaPhoto(
-                            media=BufferedInputFile(image, "ntk.png"), caption=caption
+                            media=BufferedInputFile(image, "ntk.png"),
+                            caption=caption,
+                            parse_mode="HTML",
                         ),
                     )
                     db.save_digest_state(

@@ -53,14 +53,14 @@ def decide_digest_action(now: datetime, state: DigestState | None) -> DigestActi
 
 
 def build_caption(forecast, current_count: int | None) -> str:
-    """Short caption: current count (if the library is open) + expected peak."""
+    """Short HTML caption: current count (if the library is open) + expected peak."""
     peak = max(forecast.p50)
     peak_time = forecast.timestamps[forecast.p50.index(peak)].strftime("%H:%M")
 
-    lines = ["📚 НТК сегодня"]
+    lines = ["📚 <b>НТК сегодня</b>", ""]
     if current_count:
-        lines.append(f"Сейчас: {current_count} чел.")
-    lines.append(f"Ожидаемый пик: ~{round(peak)} около {peak_time}")
+        lines.append(f"👥 Сейчас: <b>{current_count}</b> чел.")
+    lines.append(f"📈 Ожидаемый пик: <b>~{round(peak)}</b> около <b>{peak_time}</b>")
     return "\n".join(lines)
 
 

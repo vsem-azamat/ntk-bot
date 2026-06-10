@@ -50,8 +50,8 @@ def test_build_caption_reports_current_and_peak():
     ts = [datetime(2024, 3, 4, 8, 0), datetime(2024, 3, 4, 15, 0), datetime(2024, 3, 4, 22, 0)]
     forecast = DayForecast(timestamps=ts, p10=[5, 80, 5], p50=[10, 90, 10], p90=[20, 110, 20])
     caption = build_caption(forecast, current_count=420)
-    assert "Сейчас: 420 чел." in caption
-    assert "~90 около 15:00" in caption
+    assert "Сейчас: <b>420</b> чел." in caption
+    assert "<b>~90</b> около <b>15:00</b>" in caption
 
 
 def test_build_caption_omits_current_when_closed():
@@ -59,4 +59,4 @@ def test_build_caption_omits_current_when_closed():
     forecast = DayForecast(timestamps=ts, p10=[5, 80], p50=[10, 90], p90=[20, 110])
     caption = build_caption(forecast, current_count=None)
     assert "Сейчас" not in caption
-    assert "~90 около 15:00" in caption
+    assert "<b>~90</b> около <b>15:00</b>" in caption
