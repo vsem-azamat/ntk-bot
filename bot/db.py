@@ -46,6 +46,13 @@ def iter_rows() -> list[str]:
     return [f"{ts} - {people}" for ts, people in rows]
 
 
+def fetch_occupancy() -> list[tuple[datetime, int]]:
+    """Return all occupancy samples as ``(datetime, people)`` tuples, oldest first."""
+    with closing(_connect()) as conn, conn:
+        rows = conn.execute("SELECT ts, people FROM occupancy ORDER BY ts").fetchall()
+    return [(datetime.strptime(ts, _TS_FORMAT), people) for ts, people in rows]
+
+
 def export_text() -> bytes:
     """Render the whole series as a downloadable ``ntk_data.txt`` blob."""
     rows = iter_rows()
