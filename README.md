@@ -1,5 +1,5 @@
 # NTK bot
-Telegram bot in @chat_ntk chat for students who regularly visit the National Technical Library. The bot regularly collects statistics on library visits. Based on this data, simple machine learning models were created for regression of visits.
+Telegram bot in @chat_ntk chat for students who regularly visit the National Technical Library. The bot regularly collects statistics on library visits. Based on this data, machine learning models predict the expected occupancy of the library — together with an uncertainty range, not just a single number.
 
 
 | ![Daily graph with predictions](example_images/daily_graph_with_predictions.jpg) | ![Weather forecast](example_images/weather_forecast.jpg) |
@@ -22,17 +22,21 @@ Telegram bot in @chat_ntk chat for students who regularly visit the National Tec
 
 
 ## How prediction works:
-The data of visits to the National Technical Library is permanently stored. This data was processed and fed to models for training according to this principle:
+Every occupancy sample is stored permanently. For each timestamp the model builds a feature vector and predicts the number of people:
 
-| X1 | X2 | X3 | X4 | Y |
-|:---:|:---:|:---:|:---:| :---:|
-| day of the year | day of the week | time | month | number of people |
+| feature group | features |
+|:---|:---|
+| time (cyclical) | minute-of-day (sin/cos), day-of-year (sin/cos) |
+| calendar | weekday, month, weekend flag |
+| weather | temperature, precipitation, cloud cover, wind (joined by hour) |
 
-`f(X1, X2, X3, X4) = Y -> f(day of the year, day of the week, time, month) = number of people`
+Instead of a single number, three **quantile** models are trained, so the bot shows a range rather than just a point estimate:
+- **p50** — the median ("usually about this many people")
+- **p10 / p90** — the central 80% range ("normally somewhere between these")
 
-Two models are used:
-- Random Forest Regressor
-- Gradient Boosting Regressor
+The models are [CatBoost](https://catboost.ai/) gradient-boosted regressors (`loss=Quantile`). They are validated on a **time-based holdout** (the most recent weeks, never shuffled — so past predictions can't leak future data) and benchmarked against a simple **climatology baseline** (historical median per weekday × time-of-day). CatBoost ships only when it beats the baseline; otherwise — and on a cold start — the bot falls back to the baseline.
+
+Historical weather is backfilled once from the Open-Meteo archive and kept current daily; the forecast for the target day feeds the prediction.
 
 ## Installation and start
 
@@ -83,8 +87,8 @@ ANSWER_PROBABILITY=<float>
 Prefixes: `!/`
 - `/ntk` - Show the current number of people in the library
 - `/help` - Show help
-- `/graph` - Draw and send a diagram of library visits
-- `/learn` - Train (re-) regression ML models for predicting the number of people in the library
+- `/graph` - Draw and send the occupancy graph: real data, the predicted median and the p10–p90 range
+- `/learn` - Re-train the CatBoost prediction models on the stored data
 - `/weather` - Show weather forecast
 
 ## Deployment
