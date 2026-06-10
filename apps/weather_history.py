@@ -28,16 +28,20 @@ async def _get_json(url: str, params: dict) -> dict:
         return await resp.json()
 
 
-def _payload_to_rows(payload: dict) -> list[tuple[datetime, float, float, float, float]]:
+def _num(v) -> float | None:
+    return None if v is None else float(v)
+
+
+def _payload_to_rows(payload: dict) -> list[tuple[datetime, float | None, float | None, float | None, float | None]]:
     hourly = payload.get("hourly", {})
     times = hourly.get("time", [])
     return [
         (
             datetime.strptime(times[i], "%Y-%m-%dT%H:%M"),
-            float(hourly["temperature_2m"][i]),
-            float(hourly["precipitation"][i]),
-            float(hourly["cloudcover"][i]),
-            float(hourly["windspeed_10m"][i]),
+            _num(hourly["temperature_2m"][i]),
+            _num(hourly["precipitation"][i]),
+            _num(hourly["cloudcover"][i]),
+            _num(hourly["windspeed_10m"][i]),
         )
         for i in range(len(times))
     ]

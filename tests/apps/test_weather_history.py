@@ -20,6 +20,20 @@ def test_parse_hourly_payload_to_rows():
     ]
 
 
+def test_payload_to_rows_tolerates_nulls():
+    payload = {
+        "hourly": {
+            "time": ["2024-03-01T09:00"],
+            "temperature_2m": [None],
+            "precipitation": [None],
+            "cloudcover": [None],
+            "windspeed_10m": [None],
+        }
+    }
+    rows = wh._payload_to_rows(payload)
+    assert rows == [(datetime(2024, 3, 1, 9, 0), None, None, None, None)]
+
+
 async def test_backfill_upserts_from_last_known_ts(tmp_path, monkeypatch):
     from config import cnfg
 
