@@ -164,6 +164,11 @@ class PredictModels:
     def _catboost_available(self) -> bool:
         return all(Path(_model_path(n)).exists() for n in _QUANTILES)
 
+    def has_trained(self) -> bool:
+        """True once ``learn_models`` has run at least once (a ship decision was
+        recorded), so a cold start can be told apart from a plain restart."""
+        return Path(_choice_path()).exists()
+
     async def predict_day(self, target_day: datetime | None = None) -> DayForecast:
         """Public API: forecast the full day. CatBoost if it won, else baseline."""
         from bot import db

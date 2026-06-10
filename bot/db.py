@@ -31,6 +31,38 @@ def init_db() -> None:
             "CREATE TABLE IF NOT EXISTS weather ("
             " ts TEXT PRIMARY KEY, temp REAL, precip REAL, cloud REAL, wind REAL)"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS digest ("
+            " post_date TEXT PRIMARY KEY, chat_id INTEGER, message_id INTEGER,"
+            " last_update_hour INTEGER)"
+        )
+
+
+def get_digest_state() -> tuple[str, int, int, int] | None:
+    """Return the single active digest row ``(post_date, chat_id, message_id,
+    last_update_hour)`` or ``None`` if no digest is tracked."""
+    with closing(_connect()) as conn, conn:
+        row = conn.execute(
+            "SELECT post_date, chat_id, message_id, last_update_hour FROM digest LIMIT 1"
+        ).fetchone()
+    return tuple(row) if row else None
+
+
+def save_digest_state(post_date: str, chat_id: int, message_id: int, last_update_hour: int) -> None:
+    """Persist the active digest (only one is ever tracked at a time)."""
+    with closing(_connect()) as conn, conn:
+        conn.execute("DELETE FROM digest")
+        conn.execute(
+            "INSERT INTO digest (post_date, chat_id, message_id, last_update_hour)"
+            " VALUES (?, ?, ?, ?)",
+            (post_date, chat_id, message_id, last_update_hour),
+        )
+
+
+def clear_digest_state() -> None:
+    """Forget the active digest (after it has been deleted from the chat)."""
+    with closing(_connect()) as conn, conn:
+        conn.execute("DELETE FROM digest")
 
 
 def insert_occupancy(ts: datetime, people: int) -> None:
