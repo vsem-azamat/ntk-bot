@@ -1,8 +1,6 @@
 import math
 from datetime import datetime
 
-import numpy as np
-
 from apps.features import CATEGORICAL_INDICES, FEATURE_NAMES, build_features
 
 
@@ -31,6 +29,18 @@ def test_categoricals_are_strings_and_weekend_flag():
     assert float(x[0, 2]) == 1.0  # is_weekend
 
 
+def test_empty_timestamps_has_correct_2d_shape():
+    feats = build_features([])
+    assert feats.X.shape == (0, len(FEATURE_NAMES))
+    assert feats.X.dtype == object
+
+
+def test_cyclical_yday_encoding_wraps_around():
+    x = build_features([datetime(2024, 1, 1, 12, 0), datetime(2024, 12, 31, 12, 0)]).X
+    assert abs(float(x[0, 3]) - float(x[1, 3])) < 0.05  # yday_sin
+    assert abs(float(x[0, 4]) - float(x[1, 4])) < 0.05  # yday_cos
+
+
 def test_weather_join_fills_matching_hour_and_nans_when_missing():
     ts = datetime(2024, 3, 1, 9, 30)
     weather = {datetime(2024, 3, 1, 9, 0): (5.0, 0.0, 50.0, 3.0)}
@@ -39,4 +49,4 @@ def test_weather_join_fills_matching_hour_and_nans_when_missing():
 
     x_missing = build_features([ts], {}).X
     assert all(math.isnan(float(v)) for v in x_missing[0, 7:11])
-    assert isinstance(x, np.ndarray)
+    assert x.dtype == object

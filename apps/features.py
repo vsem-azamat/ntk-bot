@@ -61,5 +61,8 @@ def build_features(
     timestamps: list[datetime], weather: dict[datetime, WeatherRow] | None = None
 ) -> Features:
     """Build the feature matrix for ``timestamps``, joining ``weather`` by hour."""
-    X = np.array([_row(dt, weather) for dt in timestamps], dtype=object)
+    if not timestamps:
+        X = np.empty((0, len(FEATURE_NAMES)), dtype=object)
+    else:
+        X = np.array([_row(dt, weather) for dt in timestamps], dtype=object)
     return Features(X=X, names=list(FEATURE_NAMES), categorical_indices=list(CATEGORICAL_INDICES))
