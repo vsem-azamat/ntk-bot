@@ -109,7 +109,9 @@ class PredictModels:
             self._write_choice("climatology")
             return
 
-        weather = db.fetch_weather(rows[0][0], rows[-1][0])
+        weather = db.fetch_weather(
+            rows[0][0].replace(minute=0, second=0, microsecond=0), rows[-1][0]
+        )
 
         train_ts = [dt for dt, _ in train]
         train_y = np.array([c for _, c in train], dtype=float)
@@ -138,10 +140,19 @@ class PredictModels:
     def _predict_quantile(
         self, name: str, timestamps: list[datetime], weather: dict[datetime, WeatherRow]
     ) -> list[float]:
-        model = CatBoostRegressor()
+        model = CatBoostRegressor(allow_writing_files=False)
         model.load_model(_model_path(name))
         feats = build_features(timestamps, weather)
         return [max(0.0, float(v)) for v in model.predict(feats.X)]
+
+    def _predict_catboost(
+        self, grid: list[datetime], weather: dict
+    ) -> tuple[list[float], list[float], list[float]]:
+        return (
+            self._predict_quantile("p10", grid, weather),
+            self._predict_quantile("p50", grid, weather),
+            self._predict_quantile("p90", grid, weather),
+        )
 
     def _write_choice(self, choice: str) -> None:
         Path(_choice_path()).write_text(choice, encoding="utf-8")
@@ -169,9 +180,7 @@ class PredictModels:
             except Exception:
                 logger.exception("Forecast weather fetch failed; predicting without it")
                 weather = {}
-            p10 = self._predict_quantile("p10", grid, weather)
-            p50 = self._predict_quantile("p50", grid, weather)
-            p90 = self._predict_quantile("p90", grid, weather)
+            p10, p50, p90 = await asyncio.to_thread(self._predict_catboost, grid, weather)
         else:
             clim = build_climatology(drop_closed_hours(db.fetch_occupancy()))
             p10, p50, p90 = climatology_predict(clim, grid)
