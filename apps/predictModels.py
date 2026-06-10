@@ -14,7 +14,7 @@ import numpy as np
 from catboost import CatBoostRegressor, Pool
 
 from apps.baseline import build_climatology, climatology_predict
-from apps.features import build_features
+from apps.features import WeatherRow, build_features
 from config import cnfg
 
 logger = logging.getLogger(__name__)
@@ -120,7 +120,7 @@ class PredictModels:
         val_ts = [dt for dt, _ in val]
         val_y = np.array([c for _, c in val], dtype=float)
 
-        cat_p50 = self._predict_quantile("p50", val_ts, weather)
+        cat_p50 = await asyncio.to_thread(self._predict_quantile, "p50", val_ts, weather)
         clim = build_climatology(train)
         _, clim_p50, _ = climatology_predict(clim, val_ts)
 
@@ -136,7 +136,7 @@ class PredictModels:
             model.save_model(_model_path(name))
 
     def _predict_quantile(
-        self, name: str, timestamps: list[datetime], weather: dict
+        self, name: str, timestamps: list[datetime], weather: dict[datetime, WeatherRow]
     ) -> list[float]:
         model = CatBoostRegressor()
         model.load_model(_model_path(name))
