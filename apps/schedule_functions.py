@@ -5,6 +5,7 @@ from pathlib import Path
 
 from apps.collect_time import generate_time_list
 from apps.parse_functions import get_ntk_quantity
+from apps.weather_history import backfill
 from config import cnfg
 
 logger = logging.getLogger(__name__)
@@ -47,3 +48,14 @@ async def receive_ntk_data(delta_minutes: int = 20) -> None:
             await asyncio.sleep(delta_minutes * 60 - 60)
         else:
             await asyncio.sleep(1)
+
+
+async def weather_backfill_loop(interval_seconds: float = 24 * 60 * 60) -> None:
+    """Keep the weather table current: backfill on startup, then once per day."""
+    while True:
+        try:
+            written = await backfill()
+            logger.info("Weather backfill wrote %d rows", written)
+        except Exception:
+            logger.exception("Weather backfill failed")
+        await asyncio.sleep(interval_seconds)

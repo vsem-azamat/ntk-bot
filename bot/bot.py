@@ -3,7 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
-from apps.schedule_functions import heartbeat_loop, receive_ntk_data
+from apps.schedule_functions import heartbeat_loop, receive_ntk_data, weather_backfill_loop
 from bot import db
 from bot.handlers import router
 from config import INSTRUCTIONS_PATH, cnfg
@@ -31,6 +31,7 @@ async def on_startup(bot: Bot) -> None:
     asyncio.create_task(heartbeat_loop())
     asyncio.create_task(predictModels.learn_models())
     asyncio.create_task(receive_ntk_data(cnfg.DELTA_TIME_FOR_RECIEVE_NTK))
+    asyncio.create_task(weather_backfill_loop())
 
 
 async def on_shutdown(bot: Bot) -> None:
