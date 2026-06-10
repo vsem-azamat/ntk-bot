@@ -1,11 +1,11 @@
 import asyncio
 
-from .bot import main
-
 
 def run() -> None:
     """Synchronous entrypoint used by the ``ntk-bot`` console script."""
+    from .bot import main
+
     asyncio.run(main())
 
 
-__all__ = ["main", "run"]
+__all__ = ["run"]
