@@ -10,7 +10,7 @@ import functools
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 import holidays
 import numpy as np
@@ -106,6 +106,21 @@ class ObsContext:
     def samples_on(self, day: date) -> list[tuple[datetime, int]]:
         return self.by_day.get(day, [])
 
+    def truncated(self, day: date, cut: "datetime | None") -> "ObsContext":
+        """Return a copy where ``day``'s samples are limited to those at or before
+        ``cut`` (or the day removed entirely when ``cut`` is None). Other days are
+        shared by reference. Cheap: only the one day's list is rebuilt."""
+        new = dict(self.by_day)
+        if cut is None:
+            new.pop(day, None)
+        else:
+            kept = [(dt, c) for dt, c in self.by_day.get(day, []) if dt <= cut]
+            if kept:
+                new[day] = kept
+            else:
+                new.pop(day, None)
+        return ObsContext(by_day=new)
+
 
 @functools.lru_cache(maxsize=8)
 def _cz_holidays(year: int) -> holidays.HolidayBase:
@@ -198,3 +213,47 @@ def build_matrix(
 
     X = np.array(rows, dtype=object) if rows else np.empty((0, len(names)), dtype=object)
     return Features(X=X, names=names, categorical_indices=cat_idx)
+
+
+def build_training_matrix(
+    rows: list[tuple[datetime, int]],
+    train_days: list[date],
+    weather: dict[datetime, WeatherRow] | None = None,
+    groups: tuple[str, ...] = ("base", "regime", "asof"),
+    cut_times: tuple[time | None, ...] = (None,),
+) -> tuple[Features, np.ndarray]:
+    """Build a leak-free training matrix with as-of augmentation.
+
+    For each training day and each entry in ``cut_times`` (``None`` = cold/morning
+    start, a ``time`` = observed up to that moment), build a context truncated to
+    that cut and emit one example per actual sample that falls AFTER the cut
+    (label = that sample's count). Because targets are strictly after the cut, the
+    target never appears in its own as-of context, so ``last_count``/``peak_so_far``
+    cannot leak the label."""
+    full = ObsContext.from_rows(rows)
+    train_set = set(train_days)
+    by_day: dict[date, list[tuple[datetime, int]]] = {}
+    for dt, c in rows:
+        if dt.date() in train_set and c > 0:
+            by_day.setdefault(dt.date(), []).append((dt, c))
+
+    blocks: list[np.ndarray] = []
+    labels: list[float] = []
+    names: list[str] = []
+    cat_idx: list[int] = []
+    for day, samples in by_day.items():
+        for ct in cut_times:
+            cut = None if ct is None else datetime.combine(day, ct)
+            tctx = full.truncated(day, cut)
+            targets = [(dt, c) for dt, c in samples if cut is None or dt > cut]
+            if not targets:
+                continue
+            feats = build_matrix(
+                [dt for dt, _ in targets], ctx=tctx, weather=weather, groups=groups
+            )
+            blocks.append(feats.X)
+            labels.extend(float(c) for _, c in targets)
+            names, cat_idx = feats.names, feats.categorical_indices
+
+    X = np.vstack(blocks) if blocks else np.empty((0, len(names)), dtype=object)
+    return Features(X=X, names=names, categorical_indices=cat_idx), np.asarray(labels, float)
