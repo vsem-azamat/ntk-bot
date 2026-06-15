@@ -285,8 +285,10 @@ def build_training_matrix(
     blocks: list[np.ndarray] = []
     labels: list[float] = []
     timestamps: list[datetime] = []
-    names: list[str] = []
-    cat_idx: list[int] = []
+    # Column metadata depends only on ``groups``, so derive it once up front; this
+    # keeps ``names`` / ``categorical_indices`` correct even for an empty result.
+    meta = build_matrix([], groups=groups)
+    names, cat_idx = meta.names, meta.categorical_indices
     for day, samples in by_day.items():
         for ct in cut_times:
             cut = None if ct is None else datetime.combine(day, ct)
@@ -300,7 +302,6 @@ def build_training_matrix(
             blocks.append(feats.X)
             labels.extend(float(c) for _, c in targets)
             timestamps.extend(dt for dt, _ in targets)
-            names, cat_idx = feats.names, feats.categorical_indices
 
     X = np.vstack(blocks) if blocks else np.empty((0, len(names)), dtype=object)
     feats_out = Features(X=X, names=names, categorical_indices=cat_idx)

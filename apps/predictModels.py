@@ -20,7 +20,7 @@ import numpy as np
 from catboost import CatBoostRegressor, Pool
 
 from apps.baseline import build_climatology, climatology_predict
-from apps.features import ObsContext, build_matrix, build_training_matrix
+from apps.features import ObsContext, WeatherRow, build_matrix, build_training_matrix
 from config import cnfg
 
 logger = logging.getLogger(__name__)
@@ -210,18 +210,27 @@ class PredictModels:
         return [max(0.0, float(v)) for v in raw]
 
     def _predict_quantile(
-        self, name: str, timestamps: list[datetime], weather: dict, ctx: ObsContext | None
+        self,
+        name: str,
+        timestamps: list[datetime],
+        weather: dict[datetime, WeatherRow] | None,
+        ctx: ObsContext | None,
     ) -> list[float]:
         feats = build_matrix(timestamps, ctx=ctx, weather=weather, groups=_FEATURE_GROUPS)
         return self._predict_X(name, feats.X)
 
     def _predict_catboost(
-        self, grid: list[datetime], weather: dict, ctx: ObsContext | None
+        self,
+        grid: list[datetime],
+        weather: dict[datetime, WeatherRow] | None,
+        ctx: ObsContext | None,
     ) -> tuple[list[float], list[float], list[float]]:
+        # Build the feature matrix once and reuse it for all three quantiles.
+        feats = build_matrix(grid, ctx=ctx, weather=weather, groups=_FEATURE_GROUPS)
         return (
-            self._predict_quantile("p10", grid, weather, ctx),
-            self._predict_quantile("p50", grid, weather, ctx),
-            self._predict_quantile("p90", grid, weather, ctx),
+            self._predict_X("p10", feats.X),
+            self._predict_X("p50", feats.X),
+            self._predict_X("p90", feats.X),
         )
 
     def _write_choice(self, choice: str) -> None:
