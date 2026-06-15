@@ -24,10 +24,12 @@ def test_peak_time_error_minutes_uses_step():
 
 
 def test_pinball_loss_p90_underprediction_penalized_more():
-    under = pinball_loss([100.0], [120.0], alpha=0.9)
-    over = pinball_loss([100.0], [80.0], alpha=0.9)
-    assert math.isclose(under, 0.9 * 20.0)
-    assert math.isclose(over, 0.1 * 20.0)
+    # p90: an actual ABOVE the predicted quantile (under-prediction) is the
+    # costly error and carries the alpha=0.9 weight.
+    under = pinball_loss([100.0], [80.0], alpha=0.9)  # actual 100 > pred 80
+    over = pinball_loss([100.0], [120.0], alpha=0.9)  # actual 100 < pred 120
+    assert math.isclose(under, 0.9 * 20.0)  # 18.0
+    assert math.isclose(over, 0.1 * 20.0)  # 2.0
 
 
 def test_coverage_counts_inside_band():

@@ -33,11 +33,13 @@ def peak_time_error_minutes(pred: list[float], actual: list[float], step_minutes
 def pinball_loss(actual: list[float], pred: list[float], alpha: float) -> float:
     """Mean pinball (quantile) loss for quantile ``alpha``.
 
-    When pred > actual the (1-alpha) weight applies; when pred < actual the
-    alpha weight applies, so high-alpha quantiles penalise over-prediction more.
+    Standard convention: with ``diff = actual - pred``, an actual above the
+    predicted quantile is weighted by ``alpha`` and an actual below by
+    ``1 - alpha``. So for a high quantile (e.g. p90) under-prediction — the
+    actual exceeding the band — is the expensive error.
     """
     a, p = np.asarray(actual, float), np.asarray(pred, float)
-    diff = p - a
+    diff = a - p
     return float(np.mean(np.maximum(alpha * diff, (alpha - 1.0) * diff)))
 
 

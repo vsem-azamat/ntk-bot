@@ -100,11 +100,12 @@ def test_peak_time_error_minutes_uses_step():
 
 
 def test_pinball_loss_p90_underprediction_penalized_more():
-    # actual above prediction at high quantile is penalized by alpha
-    under = pinball_loss([100.0], [120.0], alpha=0.9)
-    over = pinball_loss([100.0], [80.0], alpha=0.9)
-    assert math.isclose(under, 0.9 * 20.0)
-    assert math.isclose(over, 0.1 * 20.0)
+    # p90: actual ABOVE the predicted quantile (under-prediction) is the costly
+    # error and carries the alpha=0.9 weight. diff = actual - pred.
+    under = pinball_loss([100.0], [80.0], alpha=0.9)  # actual 100 > pred 80
+    over = pinball_loss([100.0], [120.0], alpha=0.9)  # actual 100 < pred 120
+    assert math.isclose(under, 0.9 * 20.0)  # 18.0
+    assert math.isclose(over, 0.1 * 20.0)  # 2.0
 
 
 def test_coverage_counts_inside_band():
@@ -168,7 +169,7 @@ def peak_time_error_minutes(
 def pinball_loss(actual: list[float], pred: list[float], alpha: float) -> float:
     """Mean pinball (quantile) loss for quantile ``alpha``."""
     a, p = np.asarray(actual, float), np.asarray(pred, float)
-    diff = a - p
+    diff = a - p  # standard convention: actual minus predicted quantile
     return float(np.mean(np.maximum(alpha * diff, (alpha - 1.0) * diff)))
 
 
