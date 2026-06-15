@@ -6,10 +6,11 @@ strings (CatBoost requires int/str, never NaN), numeric columns are floats and
 may be NaN (CatBoost handles NaN natively).
 """
 
+import bisect
 import functools
 import math
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
 
 import holidays
@@ -89,6 +90,9 @@ class ObsContext:
     """
 
     by_day: dict[date, list[tuple[datetime, int]]]
+    # Lazily built index over the day keys for fast trailing-level queries.
+    _sorted_days: list[date] | None = field(default=None, compare=False, repr=False)
+    _peaks: list[int] | None = field(default=None, compare=False, repr=False)
 
     @classmethod
     def from_rows(cls, rows: list[tuple[datetime, int]]) -> "ObsContext":
@@ -105,6 +109,21 @@ class ObsContext:
 
     def samples_on(self, day: date) -> list[tuple[datetime, int]]:
         return self.by_day.get(day, [])
+
+    def _ensure_index(self) -> None:
+        if self._sorted_days is None:
+            self._sorted_days = sorted(self.by_day)
+            self._peaks = [max(c for _, c in self.by_day[d]) for d in self._sorted_days]
+
+    def trailing_level(self, day: date, trailing_days: int) -> float:
+        """Median daily peak over the up-to-``trailing_days`` days strictly before
+        ``day`` (the current day is always excluded). O(log n + trailing_days)
+        after a one-time O(n log n) index build, vs the naive O(n) per call."""
+        self._ensure_index()
+        assert self._sorted_days is not None and self._peaks is not None
+        i = bisect.bisect_left(self._sorted_days, day)  # days[:i] are strictly < day
+        window = self._peaks[max(0, i - trailing_days) : i]
+        return float(np.median(window)) if window else 0.0
 
     def truncated(self, day: date, cut: "datetime | None") -> "ObsContext":
         """Return a copy where ``day``'s samples are limited to those at or before
@@ -130,10 +149,7 @@ def _cz_holidays(year: int) -> holidays.HolidayBase:
 def regime_features(now: datetime, ctx: ObsContext, trailing_days: int = 14) -> dict:
     """Empirical 'academic calendar': trailing occupancy level (exam vs break)
     and a Czech public-holiday flag. Trailing level ignores the current day."""
-    today = now.date()
-    past_days = sorted(ctx.days_before(today))[-trailing_days:]
-    daily_peaks = [max(c for _, c in ctx.samples_on(d)) for d in past_days if ctx.samples_on(d)]
-    trailing_level = float(np.median(daily_peaks)) if daily_peaks else 0.0
+    trailing_level = ctx.trailing_level(now.date(), trailing_days)
     is_holiday = 1.0 if now.date() in _cz_holidays(now.year) else 0.0
     return {"trailing_level": trailing_level, "is_holiday": is_holiday}
 

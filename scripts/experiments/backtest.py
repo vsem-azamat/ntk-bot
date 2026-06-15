@@ -6,7 +6,7 @@ from datetime import date, datetime
 import numpy as np
 
 from apps.features import ObsContext
-from scripts.experiments.candidates import Candidate, fit_predict_day
+from scripts.experiments.candidates import Candidate, fit_models, predict_grid
 from scripts.experiments.dataset import cut_times
 from scripts.experiments.metrics import (
     coverage,
@@ -44,8 +44,9 @@ def score_day(
     weather: dict,
 ) -> list[dict]:
     results: list[dict] = []
+    models = fit_models(cand, rows, train_days, weather)  # train once, reuse per cut
     for cut in cut_times(test_day):
-        grid, p10, p50, p90 = fit_predict_day(cand, rows, ctx, train_days, test_day, cut, weather)
+        grid, p10, p50, p90 = predict_grid(cand, models, ctx, test_day, cut, weather)
         actual = _actual_on_grid(grid, rows)
         if actual is None:
             continue

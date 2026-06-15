@@ -12,17 +12,33 @@ _INTRADAY_CUTS = (time(10, 0), time(12, 0), time(14, 0))
 
 
 def walk_forward_days(
-    days: list[date], n_folds: int, min_train: int
+    days: list[date],
+    n_folds: int,
+    min_train: int,
+    max_train_days: int | None = None,
 ) -> list[tuple[list[date], date]]:
-    """Return ``n_folds`` (train_days, test_day) folds from the tail of ``days``.
+    """Return up to ``n_folds`` (train_days, test_day) folds.
 
-    Test days are the last ``n_folds`` days that still leave ``min_train`` earlier
-    days to train on. Train is every day strictly before the test day."""
+    Test days are spread EVENLY across the eligible range (every day with at least
+    ``min_train`` earlier days), so the backtest covers multiple seasons / exam
+    periods rather than only the most recent weeks. Train is every day strictly
+    before the test day, optionally capped to the most recent ``max_train_days``
+    (None = use all history) to keep training time bounded."""
     days = sorted(days)
+    eligible = days[min_train:]
+    if not eligible:
+        return []
+    n = min(n_folds, len(eligible))
+    if n == 1:
+        idxs = [len(eligible) - 1]
+    else:
+        idxs = sorted({round(i * (len(eligible) - 1) / (n - 1)) for i in range(n)})
     folds: list[tuple[list[date], date]] = []
-    candidates = [d for i, d in enumerate(days) if i >= min_train]
-    for test_day in candidates[-n_folds:]:
+    for j in idxs:
+        test_day = eligible[j]
         train = [d for d in days if d < test_day]
+        if max_train_days is not None:
+            train = train[-max_train_days:]
         folds.append((train, test_day))
     return folds
 
