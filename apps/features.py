@@ -123,6 +123,10 @@ def regime_features(now: datetime, ctx: ObsContext, trailing_days: int = 14) -> 
     return {"trailing_level": trailing_level, "is_holiday": is_holiday}
 
 
+_REGIME_NAMES = ["trailing_level", "is_holiday"]
+_ASOF_NAMES = ["has_today", "last_count", "peak_so_far", "slope", "minutes_since_first"]
+
+
 def asof_features(now: datetime, ctx: ObsContext) -> dict:
     """Features describing today's trajectory up to ``now`` (inclusive). Computed
     strictly from samples at or before ``now`` so they never leak the future."""
@@ -146,3 +150,39 @@ def asof_features(now: datetime, ctx: ObsContext) -> dict:
         "slope": last_count - prev,
         "minutes_since_first": float(minutes_since_first),
     }
+
+
+def build_matrix(
+    timestamps: list[datetime],
+    ctx: "ObsContext | None" = None,
+    weather: dict[datetime, WeatherRow] | None = None,
+    groups: tuple[str, ...] = ("base", "regime", "asof"),
+) -> Features:
+    """Build a feature matrix from selectable groups. ``base`` is the legacy
+    calendar+weather block; ``regime`` and ``asof`` need ``ctx``. Column order is
+    fixed (base, regime, asof) so names and categorical indices stay aligned."""
+    names: list[str] = []
+    cat_idx: list[int] = []
+    if "base" in groups:
+        cat_idx = list(CATEGORICAL_INDICES)
+        names += list(FEATURE_NAMES)
+    if "regime" in groups:
+        names += _REGIME_NAMES
+    if "asof" in groups:
+        names += _ASOF_NAMES
+
+    rows: list[list] = []
+    for dt in timestamps:
+        row: list = []
+        if "base" in groups:
+            row += _row(dt, weather)
+        if "regime" in groups:
+            r = regime_features(dt, ctx) if ctx is not None else {n: 0.0 for n in _REGIME_NAMES}
+            row += [r[n] for n in _REGIME_NAMES]
+        if "asof" in groups:
+            a = asof_features(dt, ctx) if ctx is not None else {n: 0.0 for n in _ASOF_NAMES}
+            row += [a[n] for n in _ASOF_NAMES]
+        rows.append(row)
+
+    X = np.array(rows, dtype=object) if rows else np.empty((0, len(names)), dtype=object)
+    return Features(X=X, names=names, categorical_indices=cat_idx)
