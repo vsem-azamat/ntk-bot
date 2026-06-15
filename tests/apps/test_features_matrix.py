@@ -32,3 +32,26 @@ def test_categorical_indices_point_at_string_columns():
     feats = build_matrix(ts, ctx=_ctx(), weather=None, groups=("base", "regime", "asof"))
     for idx in feats.categorical_indices:
         assert isinstance(feats.X[0, idx], str)
+
+
+def test_groups_without_base_have_no_categoricals():
+    ts = [datetime(2025, 3, 13, 10, 0)]
+    feats = build_matrix(ts, ctx=_ctx(), weather=None, groups=("regime", "asof"))
+    assert feats.categorical_indices == []
+    assert feats.names == [
+        "trailing_level",
+        "is_holiday",
+        "has_today",
+        "last_count",
+        "peak_so_far",
+        "count_delta",
+        "observed_span_min",
+    ]
+    assert feats.X.shape == (1, 7)
+
+
+def test_unknown_group_raises():
+    import pytest
+
+    with pytest.raises(ValueError):
+        build_matrix([datetime(2025, 3, 13, 10, 0)], ctx=_ctx(), groups=("base", "typo"))

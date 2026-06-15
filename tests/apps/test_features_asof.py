@@ -25,7 +25,8 @@ def test_uses_only_samples_at_or_before_cut():
     assert f["has_today"] == 1.0
     assert f["last_count"] == 140.0
     assert f["peak_so_far"] == 140.0
-    assert f["slope"] > 0
+    assert f["count_delta"] == 40.0  # 140 - 100
+    assert f["observed_span_min"] == 20.0  # 09:00 -> 09:20 is 20 minutes
 
 
 def test_future_samples_never_leak():

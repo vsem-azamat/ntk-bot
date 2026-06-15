@@ -10,7 +10,7 @@ import functools
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 import holidays
 import numpy as np
@@ -88,7 +88,7 @@ class ObsContext:
     training and serving see identical inputs.
     """
 
-    by_day: dict
+    by_day: dict[date, list[tuple[datetime, int]]]
 
     @classmethod
     def from_rows(cls, rows: list[tuple[datetime, int]]) -> "ObsContext":
@@ -100,10 +100,10 @@ class ObsContext:
             by_day[day].sort()
         return cls(by_day=dict(by_day))
 
-    def days_before(self, day) -> list:
+    def days_before(self, day: date) -> list[date]:
         return [d for d in self.by_day if d < day]
 
-    def samples_on(self, day) -> list:
+    def samples_on(self, day: date) -> list[tuple[datetime, int]]:
         return self.by_day.get(day, [])
 
 
@@ -117,38 +117,46 @@ def regime_features(now: datetime, ctx: ObsContext, trailing_days: int = 14) -> 
     and a Czech public-holiday flag. Trailing level ignores the current day."""
     today = now.date()
     past_days = sorted(ctx.days_before(today))[-trailing_days:]
-    daily_peaks = [max(c for _, c in ctx.samples_on(d)) for d in past_days]
+    daily_peaks = [max(c for _, c in ctx.samples_on(d)) for d in past_days if ctx.samples_on(d)]
     trailing_level = float(np.median(daily_peaks)) if daily_peaks else 0.0
     is_holiday = 1.0 if now.date() in _cz_holidays(now.year) else 0.0
     return {"trailing_level": trailing_level, "is_holiday": is_holiday}
 
 
 _REGIME_NAMES = ["trailing_level", "is_holiday"]
-_ASOF_NAMES = ["has_today", "last_count", "peak_so_far", "slope", "minutes_since_first"]
+_ASOF_NAMES = ["has_today", "last_count", "peak_so_far", "count_delta", "observed_span_min"]
 
 
 def asof_features(now: datetime, ctx: ObsContext) -> dict:
-    """Features describing today's trajectory up to ``now`` (inclusive). Computed
-    strictly from samples at or before ``now`` so they never leak the future."""
+    """Trajectory state for ``now`` derived from ``ctx``'s samples on ``now.date()``
+    with sample-time <= ``now``.
+
+    LEAKAGE CONTRACT: the caller controls the horizon via ``ctx``. At serve time
+    ``ctx`` holds only real past data, so future grid points see the latest real
+    sample. For TRAINING, the caller MUST pass a ``ctx`` whose same-day samples are
+    truncated to strictly before the target timestamp, otherwise the target leaks
+    into ``last_count``/``peak_so_far``. See the experiment harness / predictModels
+    training-example construction.
+    """
     seen = [(dt, c) for dt, c in ctx.samples_on(now.date()) if dt <= now]
     if not seen:
         return {
             "has_today": 0.0,
             "last_count": 0.0,
             "peak_so_far": 0.0,
-            "slope": 0.0,
-            "minutes_since_first": 0.0,
+            "count_delta": 0.0,
+            "observed_span_min": 0.0,
         }
     counts = [c for _, c in seen]
     last_count = float(counts[-1])
     prev = float(counts[-2]) if len(counts) >= 2 else last_count
-    minutes_since_first = (seen[-1][0] - seen[0][0]).total_seconds() / 60.0
+    observed_span_min = (seen[-1][0] - seen[0][0]).total_seconds() / 60.0
     return {
         "has_today": 1.0,
         "last_count": last_count,
         "peak_so_far": float(max(counts)),
-        "slope": last_count - prev,
-        "minutes_since_first": float(minutes_since_first),
+        "count_delta": last_count - prev,
+        "observed_span_min": float(observed_span_min),
     }
 
 
@@ -161,6 +169,10 @@ def build_matrix(
     """Build a feature matrix from selectable groups. ``base`` is the legacy
     calendar+weather block; ``regime`` and ``asof`` need ``ctx``. Column order is
     fixed (base, regime, asof) so names and categorical indices stay aligned."""
+    valid = {"base", "regime", "asof"}
+    unknown = set(groups) - valid
+    if unknown:
+        raise ValueError(f"unknown feature groups: {sorted(unknown)}")
     names: list[str] = []
     cat_idx: list[int] = []
     if "base" in groups:
