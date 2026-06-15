@@ -707,23 +707,25 @@ Create `scripts/experiments/candidates.py`:
 ```python
 """A candidate = a feature-group selection + model knobs + target transform.
 
-``fit_predict_day`` trains quantile CatBoost on the training days (optionally
-augmenting with intraday as-of cut points) and predicts the test day's grid as of
-a given cut time. This is the single function the backtest loop calls per fold.
+``fit_predict_day`` trains quantile CatBoost on the training days (with leak-free
+as-of augmentation via ``build_training_matrix``) and predicts the test day's grid
+as of a given cut time. This is the single function the backtest loop calls per
+fold.
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 import numpy as np
 from catboost import CatBoostRegressor, Pool
 
-from apps.features import ObsContext, build_matrix
+from apps.features import ObsContext, build_matrix, build_training_matrix
 from apps.predictModels import _grid
 
 _QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
-# As-of cut points used to AUGMENT training (so the model sees conditioned cases).
-_TRAIN_CUTS = (None, datetime.min.replace(hour=11), datetime.min.replace(hour=13))
+# As-of cut points used to AUGMENT training (so the model sees both the cold
+# morning case and conditioned mid-day cases). None == cold/morning start.
+_TRAIN_CUTS: tuple[time | None, ...] = (None, time(10, 0), time(12, 0), time(14, 0))
 
 
 @dataclass
@@ -745,25 +747,6 @@ def _inv(y: np.ndarray, log: bool) -> np.ndarray:
     return np.expm1(y) if log else y
 
 
-def _training_examples(
-    cand: Candidate, rows, ctx: ObsContext, train_days: list[date], weather: dict
-):
-    """Build (X, y) by emitting each training sample once per as-of train cut, so
-    the model learns both cold and conditioned regimes."""
-    ts: list[datetime] = []
-    y: list[float] = []
-    by_day: dict = {}
-    for dt, c in rows:
-        if dt.date() in set(train_days) and c > 0:
-            by_day.setdefault(dt.date(), []).append((dt, c))
-    for day, samples in by_day.items():
-        for dt, c in samples:
-            ts.append(dt)
-            y.append(float(c))
-    feats = build_matrix(ts, ctx=ctx, weather=weather, groups=cand.groups)
-    return feats, np.asarray(y, float)
-
-
 def fit_predict_day(
     cand: Candidate,
     rows,
@@ -773,8 +756,15 @@ def fit_predict_day(
     cut: datetime | None,
     weather: dict,
 ):
-    """Train on ``train_days`` and predict ``test_day``'s grid as of ``cut``."""
-    feats, y = _training_examples(cand, rows, ctx, train_days, weather)
+    """Train on ``train_days`` and predict ``test_day``'s grid as of ``cut``.
+
+    Training uses ``build_training_matrix`` (leak-free, as-of augmented). For
+    prediction the grid is the rest of ``test_day``; the as-of context is the full
+    history truncated to ``cut`` for the test day, so the conditioned features
+    reflect only what would be known at ``cut`` (morning => no today-context)."""
+    feats, y = build_training_matrix(
+        rows, train_days, weather=weather, groups=cand.groups, cut_times=_TRAIN_CUTS
+    )
     models = {}
     for name, alpha in _QUANTILES.items():
         loss = "RMSE" if alpha == 0.5 else f"Quantile:alpha={alpha}"
@@ -790,8 +780,7 @@ def fit_predict_day(
         models[name] = m
 
     grid = _grid(datetime.combine(test_day, datetime.min.time()))
-    # When conditioning, the as-of features for the grid reflect samples <= cut.
-    pred_ctx = ctx
+    pred_ctx = ctx.truncated(test_day, cut)
     gx = build_matrix(grid, ctx=pred_ctx, weather=weather, groups=cand.groups)
     out = {}
     for name in _QUANTILES:
@@ -801,9 +790,9 @@ def fit_predict_day(
     return grid, [b[0] for b in bands], [b[1] for b in bands], [b[2] for b in bands]
 ```
 
-> Note: `_TRAIN_CUTS` and the `cut`-conditioned grid features are refined in Task 8
-> after the experiment loop exists; this task only needs a working single-fold
-> train/predict that returns a monotone band.
+> Note: training uses the leak-free `build_training_matrix`; prediction truncates
+> the test day's context to `cut` so morning vs 12:00 vs 14:00 give genuinely
+> different conditioned forecasts. No further as-of refinement is needed in Task 8.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -1036,58 +1025,39 @@ git commit -m "feat(prediction): walk-forward backtest loop + report writer"
 ### Task 8: Run experiments and choose the winning config
 
 **Files:**
-- Modify: `scripts/experiments/candidates.py` (as-of conditioning refinement)
+- Modify: `scripts/experiments/candidates.py` / `run.py` (REGISTRY tuning only)
 - Create: `tmp/experiments/reports/` (generated; gitignored)
 - Create: `docs/superpowers/specs/2026-06-15-prediction-results.md` (findings)
 
 This task is **exploratory** — no single deterministic assertion. The output is a
 chosen config (feature groups + transform + params) recorded as findings.
 
+As-of conditioning is already leak-free and cut-aware (training via
+`build_training_matrix`, prediction via `ctx.truncated(test_day, cut)`), so no
+code refinement of the conditioning is needed here — only candidate tuning.
+
 - [ ] **Step 1: Establish the baseline number**
 
 Run: `DATA_DIR=tmp/experiments BOT_TOKEN=ci-token uv run python -m scripts.experiments.run --folds 30`
-Record the `base_legacy` row — this is the current production behavior's score and the bar to beat.
+Record the `base_legacy` row — this is the current production behavior's score and the bar to beat. Confirm the `full` candidate's `near_mae` at the 12:00/14:00 cuts drops relative to `base_legacy` (conditioning is working).
 
-- [ ] **Step 2: Refine as-of conditioning in `fit_predict_day`**
-
-In `scripts/experiments/candidates.py`, make grid prediction respect the `cut`:
-build the grid's as-of features from an `ObsContext` truncated to samples `<= cut`
-for the test day (so morning vs 12:00 vs 14:00 produce different conditioned
-forecasts). Replace the `pred_ctx = ctx` line in `fit_predict_day` with:
-
-```python
-    if cut is None:
-        pred_ctx = ctx
-    else:
-        truncated = [
-            (dt, c)
-            for dt, c in rows
-            if dt.date() != test_day or dt <= cut
-        ]
-        pred_ctx = ObsContext.from_rows(truncated)
-```
-
-(Add `from apps.features import ObsContext` if not already imported.) Re-run the
-backtest and confirm the `full` candidate's `near_mae` at the 12:00/14:00 cuts
-drops relative to `base_legacy`.
-
-- [ ] **Step 3: Iterate candidates until a clear winner**
+- [ ] **Step 2: Iterate candidates until a clear winner**
 
 Add/adjust entries in `REGISTRY` (feature groups, `log_target`, `depth`,
 `iterations`, `learning_rate`, `trailing_days`) and re-run. Keep iterating until
 one candidate beats `base_legacy` on the priority metrics (near-term + peak, then
 overall MAE, with coverage staying near 0.8). Record each run's report JSON.
 
-- [ ] **Step 4: Write findings**
+- [ ] **Step 3: Write findings**
 
 Create `docs/superpowers/specs/2026-06-15-prediction-results.md` with: the
 baseline numbers, the winning candidate's config and numbers, the per-cut
 near-term improvement, and the final chosen feature groups / transform / params.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add scripts/experiments/candidates.py docs/superpowers/specs/2026-06-15-prediction-results.md
+git add scripts/experiments/candidates.py scripts/experiments/run.py docs/superpowers/specs/2026-06-15-prediction-results.md
 git commit -m "experiment(prediction): backtest results + chosen config"
 ```
 
@@ -1276,16 +1246,32 @@ _FEATURE_GROUPS = ("base", "regime", "asof")
 _LOG_TARGET = False
 ```
 
-2. Replace the `build_features` calls in training/prediction with `build_matrix`
-using an `ObsContext` built from the training rows, and emit as-of augmented
-examples. Change `learn_models`' feature build to:
+2. Replace the `build_features` training call with the leak-free, as-of-augmented
+`build_training_matrix` (same primitive the harness uses, so train/serve match).
+Add `from datetime import time` usage via a module constant for the training cuts
+(after `_LOG_TARGET`):
 
 ```python
-        from apps.features import ObsContext, build_matrix
+from datetime import time as _time
 
-        ctx = ObsContext.from_rows(rows)
-        feats = build_matrix(train_ts, ctx=ctx, weather=weather, groups=_FEATURE_GROUPS)
+_TRAIN_CUTS = (None, _time(10, 0), _time(12, 0), _time(14, 0))
 ```
+
+Change `learn_models`' feature/label build (the `train_ts`/`train_y`/`feats`
+block) to:
+
+```python
+        from apps.features import build_training_matrix
+
+        train_days = sorted({dt.date() for dt, _ in train})
+        feats, train_y = build_training_matrix(
+            train, train_days, weather=weather, groups=_FEATURE_GROUPS, cut_times=_TRAIN_CUTS
+        )
+```
+
+(`train` is the chronological training split of `rows`; `build_training_matrix`
+filters to `train_days` internally and returns the aligned `feats` + `train_y`,
+so the old manual `train_ts`/`train_y`/`build_features` lines are removed.)
 
 3. Update `_fit_and_save` to apply the log transform when `_LOG_TARGET` and to
 record the group selection implicitly (models are group-specific by column order):
@@ -1340,6 +1326,16 @@ sample as the anchor, and apply `anchor_band`:
 
 Thread `ctx` into the catboost branch (`self._predict_catboost(grid, weather, ctx)`).
 The climatology fallback ignores `ctx` but still gets the anchor applied.
+
+> **Leak-free validation (important):** the holdout comparison in `learn_models`
+> (`cat_p50 = self._predict_quantile("p50", val_ts, weather)`) must NOT pass a ctx
+> that contains the validation samples themselves, or the as-of features would see
+> their own target and inflate CatBoost's apparent accuracy. Mirror the harness:
+> evaluate the holdout the same way `score_day`/`fit_predict_day` do — predict each
+> val day's grid as of cut(s) using `ctx.truncated(val_day, cut)`, against the
+> day's actuals — OR build the val features with `build_training_matrix(val, ...)`
+> and keep the parallel `val_y`. Do not reuse a full-history ctx for validation.
+> The exact shape of this is finalized against the working harness code (Task 7).
 
 - [ ] **Step 4: Run test to verify it passes**
 
