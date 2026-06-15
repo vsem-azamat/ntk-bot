@@ -13,6 +13,7 @@ dependencies = [
     "numpy>=1.26",
     "matplotlib>=3.8",
     "catboost>=1.2",
+    "holidays>=0.50",
 ]
 
 [project.scripts]

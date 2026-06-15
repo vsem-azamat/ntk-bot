@@ -497,6 +497,18 @@ wheels = [
 ]
 
 [[package]]
+name = "holidays"
+version = "0.98"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8d/a1/63c1a45599a82d91a3b5c7a4de5a6050ca253f8c0e74dd14fade3728e033/holidays-0.98.tar.gz", hash = "sha256:09b078a4695d53a35ea01517b331942f3232b3b7e3877f74f6d5227adbedc76e", size = 913785, upload-time = "2026-06-01T19:17:33.888Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/0c/51baf49265bd6c8f05bea02ae6ebc96a81218ae364fae89dd6a3e3f7d349/holidays-0.98-py3-none-any.whl", hash = "sha256:65c9ba3402f1d10cc715af0510cdc847e60d8854df640515d546748ca4a24e60", size = 1482103, upload-time = "2026-06-01T19:17:32.01Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.18"
 source = { registry = "https://pypi.org/simple" }
@@ -930,6 +942,7 @@ dependencies = [
     { name = "aiohttp" },
     { name = "beautifulsoup4" },
     { name = "catboost" },
+    { name = "holidays" },
     { name = "lxml" },
     { name = "matplotlib" },
     { name = "numpy" },
@@ -950,6 +963,7 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.9" },
     { name = "beautifulsoup4", specifier = ">=4.12" },
     { name = "catboost", specifier = ">=1.2" },
+    { name = "holidays", specifier = ">=0.50" },
     { name = "lxml", specifier = ">=5.1" },
     { name = "matplotlib", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.26" },
