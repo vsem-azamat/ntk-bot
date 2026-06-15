@@ -78,66 +78,82 @@ async def daily_maintenance_loop(interval_seconds: float = 24 * 60 * 60) -> None
         await asyncio.sleep(interval_seconds)
 
 
-async def morning_digest_loop(bot, interval_seconds: float = 60) -> None:
-    """Post / refresh / delete the daily occupancy digest.
+async def _digest_tick(bot, now: datetime) -> None:
+    """Run one digest iteration: re-derive the action from the clock + stored
+    state and post / refresh / delete accordingly.
 
-    Time-driven and restart-safe: state lives in SQLite, so every tick simply
-    re-derives the right action from the clock. No-op unless DIGEST_ENABLED.
+    Restart-safe: state lives in SQLite, so the action is a pure function of the
+    current time and the persisted row.
     """
-    if not cnfg.DIGEST_ENABLED:
-        logger.info("Morning digest disabled (DIGEST_ENABLED is off)")
-        return
-
     from datetime import date
 
+    from aiogram.exceptions import TelegramBadRequest
     from aiogram.types import BufferedInputFile, InputMediaPhoto
 
     from apps.digest import DigestAction, DigestState, decide_digest_action, render
     from bot import db
 
-    while True:
-        try:
-            now = datetime.now()
-            row = db.get_digest_state()
-            state = DigestState(date.fromisoformat(row[0]), row[1], row[2], row[3]) if row else None
-            action = decide_digest_action(now, state)
+    row = db.get_digest_state()
+    state = DigestState(date.fromisoformat(row[0]), row[1], row[2], row[3]) if row else None
+    action = decide_digest_action(now, state)
 
-            if action is DigestAction.POST:
-                image, caption = await render(now)
-                message = await bot.send_photo(
-                    cnfg.DIGEST_CHAT_ID,
-                    BufferedInputFile(image, "ntk.png"),
+    if action is DigestAction.POST:
+        image, caption = await render(now)
+        message = await bot.send_photo(
+            cnfg.DIGEST_CHAT_ID,
+            BufferedInputFile(image, "ntk.png"),
+            caption=caption,
+            parse_mode="HTML",
+        )
+        db.save_digest_state(
+            now.date().isoformat(), cnfg.DIGEST_CHAT_ID, message.message_id, now.hour
+        )
+    elif action is DigestAction.UPDATE and state is not None:
+        image, caption = await render(now)
+        try:
+            await bot.edit_message_media(
+                chat_id=state.chat_id,
+                message_id=state.message_id,
+                media=InputMediaPhoto(
+                    media=BufferedInputFile(image, "ntk.png"),
                     caption=caption,
                     parse_mode="HTML",
-                )
-                db.save_digest_state(
-                    now.date().isoformat(), cnfg.DIGEST_CHAT_ID, message.message_id, now.hour
-                )
-            elif action is DigestAction.UPDATE and state is not None:
-                image, caption = await render(now)
-                try:
-                    await bot.edit_message_media(
-                        chat_id=state.chat_id,
-                        message_id=state.message_id,
-                        media=InputMediaPhoto(
-                            media=BufferedInputFile(image, "ntk.png"),
-                            caption=caption,
-                            parse_mode="HTML",
-                        ),
-                    )
-                    db.save_digest_state(
-                        state.post_date.isoformat(), state.chat_id, state.message_id, now.hour
-                    )
-                except Exception:
-                    logger.exception("Digest update failed; forgetting the message")
-                    db.clear_digest_state()
-            elif action is DigestAction.DELETE and state is not None:
-                try:
-                    await bot.delete_message(state.chat_id, state.message_id)
-                except Exception:
-                    logger.exception("Digest delete failed; forgetting the message anyway")
-                finally:
-                    db.clear_digest_state()
+                ),
+            )
+        except TelegramBadRequest as exc:
+            # "message is not modified" is benign (two identical renders); any
+            # other bad request means the message is gone or unreachable. In
+            # NEITHER case do we repost — re-posting would duplicate the digest,
+            # which is exactly the bug we are avoiding. Keep the state and mark
+            # this hour done so we don't retry the same edit every tick.
+            if "not modified" not in str(exc).lower():
+                logger.warning("Digest edit failed; keeping existing message: %s", exc)
+        # Transient (e.g. network) errors propagate to the caller's handler so
+        # the hour is NOT marked done and the edit is retried on the next tick.
+        db.save_digest_state(
+            state.post_date.isoformat(), state.chat_id, state.message_id, now.hour
+        )
+    elif action is DigestAction.DELETE and state is not None:
+        try:
+            await bot.delete_message(state.chat_id, state.message_id)
+        except Exception:
+            logger.exception("Digest delete failed; forgetting the message anyway")
+        finally:
+            db.clear_digest_state()
+
+
+async def morning_digest_loop(bot, interval_seconds: float = 60) -> None:
+    """Post / refresh / delete the daily occupancy digest.
+
+    Time-driven and restart-safe. No-op unless DIGEST_ENABLED.
+    """
+    if not cnfg.DIGEST_ENABLED:
+        logger.info("Morning digest disabled (DIGEST_ENABLED is off)")
+        return
+
+    while True:
+        try:
+            await _digest_tick(bot, datetime.now())
         except Exception:
             logger.exception("Morning digest tick failed")
         await asyncio.sleep(interval_seconds)
