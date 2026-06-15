@@ -121,3 +121,28 @@ def regime_features(now: datetime, ctx: ObsContext, trailing_days: int = 14) -> 
     trailing_level = float(np.median(daily_peaks)) if daily_peaks else 0.0
     is_holiday = 1.0 if now.date() in _cz_holidays(now.year) else 0.0
     return {"trailing_level": trailing_level, "is_holiday": is_holiday}
+
+
+def asof_features(now: datetime, ctx: ObsContext) -> dict:
+    """Features describing today's trajectory up to ``now`` (inclusive). Computed
+    strictly from samples at or before ``now`` so they never leak the future."""
+    seen = [(dt, c) for dt, c in ctx.samples_on(now.date()) if dt <= now]
+    if not seen:
+        return {
+            "has_today": 0.0,
+            "last_count": 0.0,
+            "peak_so_far": 0.0,
+            "slope": 0.0,
+            "minutes_since_first": 0.0,
+        }
+    counts = [c for _, c in seen]
+    last_count = float(counts[-1])
+    prev = float(counts[-2]) if len(counts) >= 2 else last_count
+    minutes_since_first = (seen[-1][0] - seen[0][0]).total_seconds() / 60.0
+    return {
+        "has_today": 1.0,
+        "last_count": last_count,
+        "peak_so_far": float(max(counts)),
+        "slope": last_count - prev,
+        "minutes_since_first": float(minutes_since_first),
+    }
