@@ -4,6 +4,7 @@ message. Regression guard for the "digest posts twice instead of updating" bug.
 
 import asyncio
 from datetime import datetime
+from typing import Any, cast
 
 import pytest
 from aiogram.exceptions import TelegramBadRequest
@@ -71,7 +72,7 @@ def test_post_then_update_uses_a_single_message(digest_db):
 def test_edit_not_modified_does_not_repost(digest_db):
     """The bug: an edit that fails with 'message is not modified' must NOT cause
     the digest to be re-posted on the following tick."""
-    err = TelegramBadRequest(method=None, message="Bad Request: message is not modified")
+    err = TelegramBadRequest(method=cast(Any, None), message="Bad Request: message is not modified")
     bot = FakeBot(edit_error=err)
 
     # Post the first message.

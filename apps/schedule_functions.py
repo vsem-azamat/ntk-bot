@@ -130,9 +130,7 @@ async def _digest_tick(bot, now: datetime) -> None:
                 logger.warning("Digest edit failed; keeping existing message: %s", exc)
         # Transient (e.g. network) errors propagate to the caller's handler so
         # the hour is NOT marked done and the edit is retried on the next tick.
-        db.save_digest_state(
-            state.post_date.isoformat(), state.chat_id, state.message_id, now.hour
-        )
+        db.save_digest_state(state.post_date.isoformat(), state.chat_id, state.message_id, now.hour)
     elif action is DigestAction.DELETE and state is not None:
         try:
             await bot.delete_message(state.chat_id, state.message_id)
