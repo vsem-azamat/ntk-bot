@@ -37,14 +37,16 @@ def _seed_pattern(db, days=20):
 async def test_catboost_fit_save_load_predict_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
-    from apps.features import build_features
+    from apps.features import ObsContext, build_matrix
     from apps.predictModels import _model_path, predictModels
     from bot import db
 
     db.init_db()
     _seed_pattern(db)
     occ = db.fetch_occupancy()
-    feats = build_features([dt for dt, _ in occ], {})
+    ctx = ObsContext.from_rows(occ)
+    # Train on the same feature groups the predictor builds (base+regime+asof).
+    feats = build_matrix([dt for dt, _ in occ], ctx=ctx, weather={})
     y = np.array([c for _, c in occ], dtype=float)
 
     predictModels._fit_and_save(feats, y)  # trains the trio via Pool(cat_features=[5,6])
@@ -52,7 +54,7 @@ async def test_catboost_fit_save_load_predict_roundtrip(tmp_path, monkeypatch):
     for name in ("p10", "p50", "p90"):
         assert os.path.exists(_model_path(name)), f"{name}.cbm not written"
 
-    preds = predictModels._predict_quantile("p50", [dt for dt, _ in occ][:5], {})
+    preds = predictModels._predict_quantile("p50", [dt for dt, _ in occ][:5], {}, ctx)
     assert len(preds) == 5
     assert all(p >= 0 for p in preds)
 
@@ -60,15 +62,17 @@ async def test_catboost_fit_save_load_predict_roundtrip(tmp_path, monkeypatch):
 async def test_predict_day_catboost_branch_returns_monotone_band(tmp_path, monkeypatch):
     monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
-    from apps.features import build_features
+    from apps.features import ObsContext, build_matrix
     from apps.predictModels import predictModels
     from bot import db
 
     db.init_db()
     _seed_pattern(db)
     occ = db.fetch_occupancy()
+    ctx = ObsContext.from_rows(occ)
     predictModels._fit_and_save(
-        build_features([dt for dt, _ in occ], {}), np.array([c for _, c in occ], dtype=float)
+        build_matrix([dt for dt, _ in occ], ctx=ctx, weather={}),
+        np.array([c for _, c in occ], dtype=float),
     )
     predictModels._write_choice("catboost")  # force the catboost branch
 

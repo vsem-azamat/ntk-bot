@@ -12,6 +12,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
+from typing import Literal, overload
 
 import holidays
 import numpy as np
@@ -231,13 +232,37 @@ def build_matrix(
     return Features(X=X, names=names, categorical_indices=cat_idx)
 
 
+@overload
+def build_training_matrix(
+    rows: list[tuple[datetime, int]],
+    train_days: list[date],
+    weather: dict[datetime, WeatherRow] | None = ...,
+    groups: tuple[str, ...] = ...,
+    cut_times: tuple[time | None, ...] = ...,
+    return_timestamps: Literal[False] = ...,
+) -> tuple[Features, np.ndarray]: ...
+
+
+@overload
+def build_training_matrix(
+    rows: list[tuple[datetime, int]],
+    train_days: list[date],
+    weather: dict[datetime, WeatherRow] | None = ...,
+    groups: tuple[str, ...] = ...,
+    cut_times: tuple[time | None, ...] = ...,
+    *,
+    return_timestamps: Literal[True],
+) -> tuple[Features, np.ndarray, list[datetime]]: ...
+
+
 def build_training_matrix(
     rows: list[tuple[datetime, int]],
     train_days: list[date],
     weather: dict[datetime, WeatherRow] | None = None,
     groups: tuple[str, ...] = ("base", "regime", "asof"),
     cut_times: tuple[time | None, ...] = (None,),
-) -> tuple[Features, np.ndarray]:
+    return_timestamps: bool = False,
+) -> tuple[Features, np.ndarray] | tuple[Features, np.ndarray, list[datetime]]:
     """Build a leak-free training matrix with as-of augmentation.
 
     For each training day and each entry in ``cut_times`` (``None`` = cold/morning
@@ -245,7 +270,11 @@ def build_training_matrix(
     that cut and emit one example per actual sample that falls AFTER the cut
     (label = that sample's count). Because targets are strictly after the cut, the
     target never appears in its own as-of context, so ``last_count``/``peak_so_far``
-    cannot leak the label."""
+    cannot leak the label.
+
+    With ``return_timestamps=True`` also returns the target timestamp for each row
+    (same order as ``X``/``y``), which lets a caller score a second model (e.g. the
+    climatology baseline) on the exact same leak-free examples."""
     full = ObsContext.from_rows(rows)
     train_set = set(train_days)
     by_day: dict[date, list[tuple[datetime, int]]] = {}
@@ -255,6 +284,7 @@ def build_training_matrix(
 
     blocks: list[np.ndarray] = []
     labels: list[float] = []
+    timestamps: list[datetime] = []
     names: list[str] = []
     cat_idx: list[int] = []
     for day, samples in by_day.items():
@@ -269,7 +299,12 @@ def build_training_matrix(
             )
             blocks.append(feats.X)
             labels.extend(float(c) for _, c in targets)
+            timestamps.extend(dt for dt, _ in targets)
             names, cat_idx = feats.names, feats.categorical_indices
 
     X = np.vstack(blocks) if blocks else np.empty((0, len(names)), dtype=object)
-    return Features(X=X, names=names, categorical_indices=cat_idx), np.asarray(labels, float)
+    feats_out = Features(X=X, names=names, categorical_indices=cat_idx)
+    y = np.asarray(labels, float)
+    if return_timestamps:
+        return feats_out, y, timestamps
+    return feats_out, y
