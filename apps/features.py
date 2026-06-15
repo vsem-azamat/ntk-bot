@@ -6,10 +6,13 @@ strings (CatBoost requires int/str, never NaN), numeric columns are floats and
 may be NaN (CatBoost handles NaN natively).
 """
 
+import functools
 import math
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
+import holidays
 import numpy as np
 
 FEATURE_NAMES = [
@@ -74,3 +77,47 @@ def build_features(
     else:
         X = np.array([_row(dt, weather) for dt in timestamps], dtype=object)
     return Features(X=X, names=list(FEATURE_NAMES), categorical_indices=list(CATEGORICAL_INDICES))
+
+
+@dataclass
+class ObsContext:
+    """Occupancy history used to derive regime + as-of features without leakage.
+
+    ``by_day`` maps a ``date`` to its sorted ``(datetime, count)`` samples. Every
+    derived feature is computed strictly from samples at or before a cut time, so
+    training and serving see identical inputs.
+    """
+
+    by_day: dict
+
+    @classmethod
+    def from_rows(cls, rows: list[tuple[datetime, int]]) -> "ObsContext":
+        by_day: dict = defaultdict(list)
+        for dt, count in rows:
+            if count > 0:
+                by_day[dt.date()].append((dt, count))
+        for day in by_day:
+            by_day[day].sort()
+        return cls(by_day=dict(by_day))
+
+    def days_before(self, day) -> list:
+        return [d for d in self.by_day if d < day]
+
+    def samples_on(self, day) -> list:
+        return self.by_day.get(day, [])
+
+
+@functools.lru_cache(maxsize=8)
+def _cz_holidays(year: int) -> holidays.HolidayBase:
+    return holidays.CZ(years=year)
+
+
+def regime_features(now: datetime, ctx: ObsContext, trailing_days: int = 14) -> dict:
+    """Empirical 'academic calendar': trailing occupancy level (exam vs break)
+    and a Czech public-holiday flag. Trailing level ignores the current day."""
+    today = now.date()
+    past_days = sorted(ctx.days_before(today))[-trailing_days:]
+    daily_peaks = [max(c for _, c in ctx.samples_on(d)) for d in past_days]
+    trailing_level = float(np.median(daily_peaks)) if daily_peaks else 0.0
+    is_holiday = 1.0 if now.date() in _cz_holidays(now.year) else 0.0
+    return {"trailing_level": trailing_level, "is_holiday": is_holiday}
