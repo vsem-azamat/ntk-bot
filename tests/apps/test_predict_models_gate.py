@@ -1,4 +1,4 @@
-from apps.predictModels import better_than_baseline
+from apps.predictModels import better_than_baseline, choose_model
 
 
 def test_catboost_wins_when_lower_error():
@@ -17,9 +17,6 @@ def test_catboost_loses_when_worse_overall():
     cat = {"mae": 41.0, "near_mae": 10.0}
     clim = {"mae": 40.0, "near_mae": 35.0}
     assert better_than_baseline(cat, clim) is False
-
-
-from apps.predictModels import choose_model  # noqa: E402
 
 
 def test_incumbent_kept_on_marginal_loss():
@@ -45,3 +42,9 @@ def test_switch_on_clear_win():
         )
         == "catboost"
     )
+
+
+def test_incumbent_catboost_dropped_on_near_term_regression():
+    cat = {"mae": 100.0, "near_mae": 150.0}
+    clim = {"mae": 97.0, "near_mae": 90.0}
+    assert choose_model(cat, clim, "catboost") == "climatology"

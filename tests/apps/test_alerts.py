@@ -14,11 +14,11 @@ def test_alerts_once_at_threshold_then_recovers():
     texts = [m.record_failure(T0 + timedelta(minutes=20 * i), TimeoutError("t")) for i in range(5)]
     assert texts[:2] == [None, None]
     assert (
-        texts[2] is not None and "3 scrapes failed" in texts[2] and "2026-10-21 17:40" in texts[2]
+        texts[2] is not None and "3 samples failed" in texts[2] and "2026-10-21 17:40" in texts[2]
     )
     assert texts[3:] == [None, None]
     recovered = m.record_success(T0 + timedelta(hours=3))
-    assert recovered is not None and "after 5 failed scrapes" in recovered
+    assert recovered is not None and "after 5 failed samples" in recovered
     assert m.record_success(T0 + timedelta(hours=4)) is None
 
 

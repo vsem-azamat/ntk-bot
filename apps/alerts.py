@@ -38,7 +38,7 @@ class CollectionMonitor:
             return None
         self.alerted = True
         return (
-            f"NTK collector: {self.failures} scrapes failed in a row since "
+            f"NTK collector: {self.failures} samples failed in a row since "
             f"{self.first_failure:%Y-%m-%d %H:%M}.\nLast error: {self.last_error}"
         )
 
@@ -48,7 +48,7 @@ class CollectionMonitor:
         if self.alerted and self.first_failure is not None:
             text = (
                 f"NTK collector recovered at {now:%Y-%m-%d %H:%M} after "
-                f"{self.failures} failed scrapes (since {self.first_failure:%Y-%m-%d %H:%M})."
+                f"{self.failures} failed samples (since {self.first_failure:%Y-%m-%d %H:%M})."
             )
         self.failures = 0
         self.first_failure = None

@@ -70,8 +70,9 @@ def usable_samples(rows: list[tuple[datetime, int]]) -> list[tuple[datetime, int
 def time_split(
     rows: list[tuple[datetime, int]], holdout_weeks: int = _HOLDOUT_WEEKS
 ) -> tuple[list[tuple[datetime, int]], list[tuple[datetime, int]]]:
-    """Split chronologically: last ``holdout_weeks`` as validation, rest as train."""
-    cutoff = rows[-1][0] - timedelta(weeks=holdout_weeks)
+    """Split chronologically at a day boundary: the last ``holdout_weeks`` as
+    validation, the rest as train (a whole day is always on one side)."""
+    cutoff = datetime.combine((rows[-1][0] - timedelta(weeks=holdout_weeks)).date(), time())
     train = [r for r in rows if r[0] < cutoff]
     val = [r for r in rows if r[0] >= cutoff]
     return train, val
@@ -130,10 +131,15 @@ def better_than_baseline(cat: dict, clim: dict) -> bool:
 
 def choose_model(cat: dict, clim: dict, incumbent: str, margin: float = _SWITCH_MARGIN) -> str:
     """Pick the served model with hysteresis: the challenger must beat the
-    incumbent's overall MAE by ``margin`` (relative) to replace it, so a coin-flip
-    holdout does not swap the forecast shape every day."""
+    incumbent by ``margin`` (relative) to replace it, so a coin-flip holdout does
+    not swap the forecast shape every day. An incumbent CatBoost is also dropped
+    when its near-term error is clearly worse than the baseline's."""
     if incumbent == "catboost":
-        return "climatology" if clim["mae"] < cat["mae"] * (1 - margin) else "catboost"
+        if clim["mae"] < cat["mae"] * (1 - margin):
+            return "climatology"
+        if clim["near_mae"] < cat["near_mae"] * (1 - margin):
+            return "climatology"
+        return "catboost"
     if better_than_baseline(cat, clim) and cat["mae"] < clim["mae"] * (1 - margin):
         return "catboost"
     return "climatology"

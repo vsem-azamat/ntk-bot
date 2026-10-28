@@ -18,11 +18,20 @@ from datetime import date, datetime, timedelta
 import numpy as np
 
 from apps.hours import day_type
+from config import cnfg
 
 DEFAULT_K = 6
 DEFAULT_MAX_AGE_DAYS = 56
-# Minimum samples for a day to count as a usable reference curve.
-_MIN_DAY_SAMPLES = 20
+# A day counts as a usable reference curve when it has at least this share of
+# the samples a full open window yields at the configured collection interval.
+_MIN_DAY_COVERAGE = 0.5
+_OPEN_WINDOW_MIN = 14 * 60  # shortest open window (weekend 10:00-24:00)
+
+
+def _min_day_samples() -> int:
+    return max(1, int(_OPEN_WINDOW_MIN / cnfg.DELTA_TIME_FOR_RECIEVE_NTK * _MIN_DAY_COVERAGE))
+
+
 _BUCKET_MIN = 10
 
 
@@ -44,11 +53,12 @@ def _reference_days(
     by_day: dict[date, list[tuple[datetime, int]]], target: date, k: int, max_age_days: int
 ) -> list[date]:
     kind = day_type(target)
+    min_samples = _min_day_samples()
     oldest = target - timedelta(days=max_age_days)
     candidates = [
         d
         for d in sorted(by_day)
-        if oldest <= d < target and day_type(d) == kind and len(by_day[d]) >= _MIN_DAY_SAMPLES
+        if oldest <= d < target and day_type(d) == kind and len(by_day[d]) >= min_samples
     ]
     if not candidates:
         # Nothing recent (long gap / cold start): fall back to the latest days of
@@ -56,7 +66,7 @@ def _reference_days(
         candidates = [
             d
             for d in sorted(by_day)
-            if d < target and day_type(d) == kind and len(by_day[d]) >= _MIN_DAY_SAMPLES
+            if d < target and day_type(d) == kind and len(by_day[d]) >= min_samples
         ]
     return candidates[-k:]
 

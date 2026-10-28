@@ -4,6 +4,7 @@ from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from apps.hours import is_open_sample
 from apps.parse_functions import get_ntk_quantity
 from bot import db
 from bot.filters import NTKChatFilter
@@ -21,9 +22,13 @@ async def ntk(message: types.Message):
         text = f"📚<b>В NTK сейчас людей:</b> {q}"
     except Exception:
         logger.exception("Live NTK count failed")
-        last = db.latest_occupancy()
+        try:
+            last = db.latest_occupancy()
+        except Exception:
+            logger.exception("Could not read the last stored count")
+            last = None
         text = "📚 Сайт NTK сейчас не отвечает."
-        if last:
+        if last and is_open_sample(last[0]):
             text += f"\nПоследнее значение: <b>{last[1]}</b> ({last[0]:%d.%m %H:%M})"
     await message.answer(
         text=text,

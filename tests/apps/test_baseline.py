@@ -36,7 +36,7 @@ def test_never_looks_at_target_day_or_later():
 
 def test_interpolates_between_sample_times():
     day = date(2024, 3, 1)
-    rows = [(datetime(2024, 3, 1, 10, 0), 100), (datetime(2024, 3, 1, 10, 20), 200)] * 1
+    rows = [(datetime(2024, 3, 1, 10, 0), 100), (datetime(2024, 3, 1, 10, 20), 200)]
     rows += [(datetime(2024, 3, 1, 10, 40 + i), 200) for i in range(20)]  # make it a usable day
     clim = build_climatology(rows, day + timedelta(weeks=1))
     _, p50, _ = climatology_predict(clim, [datetime(2024, 3, 8, 10, 10)])

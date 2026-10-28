@@ -53,7 +53,7 @@ class PlotGraphs:
         datetimes: list[datetime] = []
         quantities: list[int] = []
         for row_datetime, count in db.fetch_occupancy():
-            if count != 0 and start_datetime <= row_datetime <= end_datetime:
+            if count != 0 and start_datetime <= row_datetime < end_datetime:
                 datetimes.append(row_datetime)
                 quantities.append(count)
         return datetimes, quantities
