@@ -53,6 +53,16 @@ GitHub):
 - Container timezone is `Europe/Prague`, so collection windows and stored
   timestamps are local.
 
+## Backups
+
+The `db-backup` service in the same compose stack runs `pg_dump --format=custom`
+right after every deploy and then daily at 03:40 UTC into `backups/` next to
+the deploy directory (`ntk-<UTC timestamp>.dump`, mode 600, 30 days). Restore:
+
+```sh
+pg_restore --no-owner --clean --if-exists -d "$DATABASE_URL" backups/ntk-<stamp>.dump
+```
+
 ## Re-training
 
 Models retrain once a day (and on a cold start) and can be retrained on demand by a super admin with

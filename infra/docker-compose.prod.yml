@@ -30,5 +30,20 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  db-backup:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/db-backup.sh"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    volumes:
+      - ./db-backup.sh:/opt/db-backup.sh:ro
+      - ../db-ca.crt:/run/ntk/db-ca.crt:ro
+      - ../backups:/backups
+    logging:
+      options:
+        max-size: "1m"
+        max-file: "3"
+
 volumes:
   ntk_data:
