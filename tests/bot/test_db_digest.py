@@ -1,12 +1,4 @@
-from config import cnfg
-
-
-def _use_tmp_db(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
-
-
 def test_digest_state_roundtrip_and_clear(tmp_path, monkeypatch):
-    _use_tmp_db(tmp_path, monkeypatch)
     from bot import db
 
     db.init_db()

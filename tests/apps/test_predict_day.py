@@ -7,7 +7,6 @@ from config import cnfg
 
 
 async def test_predict_day_falls_back_to_baseline_and_returns_monotone_band(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
     from bot import db
 
@@ -35,7 +34,6 @@ def _seed_pattern(db, days=20):
 
 
 async def test_catboost_fit_save_load_predict_roundtrip(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
     from apps.features import ObsContext, build_matrix
     from apps.predictModels import _model_path, predictModels
@@ -60,7 +58,6 @@ async def test_catboost_fit_save_load_predict_roundtrip(tmp_path, monkeypatch):
 
 
 async def test_predict_day_catboost_branch_returns_monotone_band(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
     from apps.features import ObsContext, build_matrix
     from apps.predictModels import predictModels

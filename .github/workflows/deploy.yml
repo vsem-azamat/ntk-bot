@@ -38,6 +38,8 @@ jobs:
       ANSWER_PROBABILITY: ${{ secrets.ANSWER_PROBABILITY || '0.025' }}
       DIGEST_ENABLED: ${{ secrets.DIGEST_ENABLED || 'false' }}
       DIGEST_CHAT_ID: ${{ secrets.DIGEST_CHAT_ID }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
       ALERT_CHAT_ID: ${{ secrets.ALERT_CHAT_ID }}
       ALERT_THREAD_ID: ${{ secrets.ALERT_THREAD_ID }}
     steps:
@@ -62,6 +64,8 @@ jobs:
           [ "$SSH_KEY_PRESENT" != "true" ] && missing="$missing DEMO_SSH_KEY"
           [ -z "$DEPLOY_DIR" ] && missing="$missing NTK_DEPLOY_DIR"
           [ -z "$BOT_TOKEN" ] && missing="$missing BOT_TOKEN"
+          [ -z "$DATABASE_URL" ] && missing="$missing DATABASE_URL"
+          [ -z "$DATABASE_CA_CERT" ] && missing="$missing DATABASE_CA_CERT"
           if [ -n "$missing" ]; then
             echo "::error::Missing required deployment secrets:$missing"
             exit 1
@@ -153,11 +157,19 @@ jobs:
             [ -n "$ALERT_CHAT_ID" ] && echo "ALERT_CHAT_ID=${ALERT_CHAT_ID}"
             [ -n "$ALERT_THREAD_ID" ] && echo "ALERT_THREAD_ID=${ALERT_THREAD_ID}"
             echo "DATA_DIR=/data"
+            echo "DATABASE_URL=${DATABASE_URL}"
           } > "$tmp_env"
           rsync -az --chmod=F600 \
             -e "ssh -i ~/.ssh/deploy_key -p $SSH_PORT" \
             "$tmp_env" "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/.env"
           rm -f "$tmp_env"
+          # CA that signs the database server certificate (sslmode=verify-full).
+          tmp_ca="$(mktemp)"
+          printf '%s\n' "$DATABASE_CA_CERT" > "$tmp_ca"
+          rsync -az --chmod=F644 \
+            -e "ssh -i ~/.ssh/deploy_key -p $SSH_PORT" \
+            "$tmp_ca" "$SSH_USER@$SSH_HOST:$DEPLOY_DIR/db-ca.crt"
+          rm -f "$tmp_ca"
 
       # Pull with this job's short-lived token, kept in a project-local Docker
       # config so it neither depends on nor overwrites the host's shared

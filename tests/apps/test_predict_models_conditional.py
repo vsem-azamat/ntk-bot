@@ -12,7 +12,6 @@ from config import cnfg
 
 @pytest.fixture
 def trained(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
 
     async def _no_weather(_target):

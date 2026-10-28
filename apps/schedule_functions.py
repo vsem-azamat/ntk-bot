@@ -41,6 +41,7 @@ async def collect_once(bot, monitor: CollectionMonitor, now: datetime) -> None:
         db.insert_occupancy(now, quantity_ntk)
     except Exception as exc:
         logger.exception("Failed to collect NTK occupancy data")
+        db.record_scrape_failure(now, f"{type(exc).__name__}: {exc}")
         text = monitor.record_failure(now, exc)
     else:
         text = monitor.record_success(now)

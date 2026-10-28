@@ -9,6 +9,9 @@ services:
       DATA_DIR: /data
     volumes:
       - ntk_data:/data
+      # CA for the PostgreSQL server certificate; DATABASE_URL points
+      # sslrootcert at this path.
+      - ../db-ca.crt:/run/ntk/db-ca.crt:ro
     healthcheck:
       test:
         - CMD

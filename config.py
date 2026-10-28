@@ -9,7 +9,8 @@ DATA_DIR: str = config("DATA_DIR", cast=str, default=".")
 
 BAD_WORDS_PATH = "bad_words.txt"
 INSTRUCTIONS_PATH = str(Path(DATA_DIR) / ".instructions")
-DB_PATH = str(Path(DATA_DIR) / "ntk.sqlite")
+# Pre-Postgres SQLite database, imported once on startup and then kept as a cold copy.
+LEGACY_DB_PATH = str(Path(DATA_DIR) / "ntk.sqlite")
 HEARTBEAT_PATH = str(Path(DATA_DIR) / "heartbeat")
 
 
@@ -50,8 +51,13 @@ class Config:
     # >>>>>>>>>> FILES <<<<<<<<<< #
     BAD_WORDS: list[str] = _load_lines(BAD_WORDS_PATH)
     DATA_DIR: str = DATA_DIR
-    DB_PATH: str = DB_PATH
+    LEGACY_DB_PATH: str = LEGACY_DB_PATH
     HEARTBEAT_PATH: str = HEARTBEAT_PATH
+
+    # >>>>>>>>>> DATABASE <<<<<<<<<< #
+    # libpq URL of the PostgreSQL database (sslmode/sslrootcert/hostaddr go in
+    # the query string in production).
+    DATABASE_URL: str = config("DATABASE_URL", cast=str, default="")
 
     # >>>>>>>>>> PARSERS <<<<<<<<<< #
     DELTA_TIME_FOR_RECIEVE_NTK: int = config("DELTA_TIME", cast=int, default=20)
