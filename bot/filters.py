@@ -1,5 +1,5 @@
 from aiogram.filters import BaseFilter
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from config import cnfg
 
@@ -24,5 +24,5 @@ class NTKChatFilter(BaseFilter):
 
 
 class SuperAdmins(BaseFilter):
-    async def __call__(self, message: Message) -> bool:
-        return message.from_user.id in cnfg.SUPER_ADMINS
+    async def __call__(self, event: Message | CallbackQuery) -> bool:
+        return event.from_user is not None and event.from_user.id in cnfg.SUPER_ADMINS

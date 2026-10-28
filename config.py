@@ -2,13 +2,14 @@ from pathlib import Path
 
 from decouple import config
 
-# Directory that holds all mutable runtime state (SQLite DB, trained models,
-# the GPT instructions file, the liveness heartbeat). "." for local dev,
+# Directory that holds local runtime state (trained models, the outbox, the
+# liveness heartbeat, the legacy files imported once). "." for local dev,
 # "/data" (a Docker volume) in production.
 DATA_DIR: str = config("DATA_DIR", cast=str, default=".")
 
 BAD_WORDS_PATH = "bad_words.txt"
-INSTRUCTIONS_PATH = str(Path(DATA_DIR) / ".instructions")
+# Legacy LLM prompt file, imported once into the settings table if no prompt is stored.
+LEGACY_INSTRUCTIONS_PATH = str(Path(DATA_DIR) / ".instructions")
 # Pre-Postgres SQLite database, imported once on startup and then kept as a cold copy.
 LEGACY_DB_PATH = str(Path(DATA_DIR) / "ntk.sqlite")
 HEARTBEAT_PATH = str(Path(DATA_DIR) / "heartbeat")
@@ -21,15 +22,6 @@ def _load_lines(path: str) -> list[str]:
             return [line.strip() for line in file if line.strip()]
     except FileNotFoundError:
         return []
-
-
-def _load_text(path: str) -> str:
-    """Return the contents of ``path`` (empty string if missing)."""
-    try:
-        with open(path, encoding="utf-8") as file:
-            return file.read()
-    except FileNotFoundError:
-        return ""
 
 
 class Config:
@@ -52,6 +44,7 @@ class Config:
     BAD_WORDS: list[str] = _load_lines(BAD_WORDS_PATH)
     DATA_DIR: str = DATA_DIR
     LEGACY_DB_PATH: str = LEGACY_DB_PATH
+    LEGACY_INSTRUCTIONS_PATH: str = LEGACY_INSTRUCTIONS_PATH
     HEARTBEAT_PATH: str = HEARTBEAT_PATH
 
     # >>>>>>>>>> DATABASE <<<<<<<<<< #
@@ -76,9 +69,9 @@ class Config:
 
     # >>>>>>>>>> OPENROUTER <<<<<<<<<< #
     OPENROUTER_API_KEY: str = config("OPENROUTER_API_KEY", cast=str, default="")
-    OPENROUTER_MODEL: str = config("OPENROUTER_MODEL", cast=str, default="openai/gpt-6-luna")
-    INSTRUCTIONS: str = _load_text(INSTRUCTIONS_PATH)
-    GPT_ANSWER_PROBABILITY: float = config("ANSWER_PROBABILITY", cast=float, default=0.025)
+    OPENROUTER_MODEL: str = config("OPENROUTER_MODEL", cast=str, default="openai/gpt-6-luna-pro")
+    # Default reply probability until one is chosen with /llm (stored in the DB).
+    LLM_ANSWER_PROBABILITY: float = config("ANSWER_PROBABILITY", cast=float, default=0.025)
 
 
 cnfg = Config()

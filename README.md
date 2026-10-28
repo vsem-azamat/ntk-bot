@@ -57,9 +57,9 @@ Tables are created on the first connection. Trained models and the local outbox 
 |:---|:---|:---|
 | `DELTA_TIME` | `20` | minutes between occupancy samples |
 | `SUPER_ADMINS` | — | comma-separated admin user IDs |
-| `OPENROUTER_API_KEY` | — | [OpenRouter](https://openrouter.ai/) key for random GPT replies |
-| `OPENROUTER_MODEL` | `openai/gpt-6-luna` | model slug for OpenRouter |
-| `ANSWER_PROBABILITY` | `0.025` | chance of a random GPT reply |
+| `OPENROUTER_API_KEY` | — | [OpenRouter](https://openrouter.ai/) key for random LLM replies |
+| `OPENROUTER_MODEL` | `openai/gpt-6-luna-pro` | model slug for OpenRouter |
+| `ANSWER_PROBABILITY` | `0.025` | default chance of a random LLM reply until one is chosen with `/llm` |
 | `ALERT_CHAT_ID` / `ALERT_THREAD_ID` | — | chat / forum topic for collector outage alerts |
 
 ### Development
@@ -77,6 +77,11 @@ TEST_DATABASE_URL=postgresql://postgres:ntk@localhost:55432/postgres uv run pyte
 - `/graph` — occupancy chart: real data, predicted median and the p10–p90 range
 - `/learn` — re-train the prediction models on stored data *(admin)*
 - `/data` — export the occupancy series as text *(admin)*
+- `/llm` — how often the bot answers chat messages with the LLM *(admin)*
+- `/prompt` — show the LLM system prompt *(admin, private chat with the bot)*
+- `/setprompt` — reply to a message or a `.txt` file with the new prompt *(admin, private chat with the bot)*
+
+The LLM persona prompt and the reply probability live in the database (`settings` table), not in the repository: they change from Telegram without a deploy and are included in the database backups. The bot keeps them in memory, so chat messages never wait on the database. The previous prompt is kept as `llm_prompt_previous`.
 
 ## Deployment
 

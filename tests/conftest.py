@@ -9,10 +9,11 @@ import os
 
 import pytest
 
+from apps import llm
 from bot import db
 from config import cnfg
 
-_TABLES = ("occupancy", "weather", "digest", "scrape_failures")
+_TABLES = ("occupancy", "weather", "digest", "scrape_failures", "settings")
 
 
 def pytest_sessionstart(session):
@@ -28,6 +29,7 @@ def _fresh_database(tmp_path, monkeypatch):
     url = os.environ.get("TEST_DATABASE_URL", "")
     monkeypatch.setattr(cnfg, "DATABASE_URL", url)
     db.close()
+    llm._settings.reset()
     if url:
         db.init_db()
         with db._conn() as conn:
