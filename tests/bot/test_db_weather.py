@@ -1,14 +1,7 @@
 from datetime import datetime
 
-from config import cnfg
-
-
-def _use_tmp_db(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
-
 
 def test_weather_upsert_fetch_and_max_ts(tmp_path, monkeypatch):
-    _use_tmp_db(tmp_path, monkeypatch)
     from bot import db
 
     db.init_db()

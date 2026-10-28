@@ -9,6 +9,9 @@ services:
       DATA_DIR: /data
     volumes:
       - ntk_data:/data
+      # CA for the PostgreSQL server certificate; DATABASE_URL points
+      # sslrootcert at this path.
+      - ../db-ca.crt:/run/ntk/db-ca.crt:ro
     healthcheck:
       test:
         - CMD
@@ -25,6 +28,23 @@ services:
     logging:
       options:
         max-size: "10m"
+        max-file: "3"
+
+  db-backup:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/opt/db-backup.sh"]
+    # Dumps belong to the deploy user on the host, not root.
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+    volumes:
+      - ./db-backup.sh:/opt/db-backup.sh:ro
+      - ../db-ca.crt:/run/ntk/db-ca.crt:ro
+      - ../backups:/backups
+    logging:
+      options:
+        max-size: "1m"
         max-file: "3"
 
 volumes:

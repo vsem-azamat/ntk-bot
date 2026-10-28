@@ -35,9 +35,7 @@ def test_payload_to_rows_tolerates_nulls():
 
 
 async def test_backfill_upserts_from_last_known_ts(tmp_path, monkeypatch):
-    from config import cnfg
 
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     from bot import db
 
     db.init_db()

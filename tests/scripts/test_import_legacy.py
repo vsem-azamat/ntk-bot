@@ -6,7 +6,6 @@ from scripts.import_legacy_ntk_data import import_file
 
 @pytest.fixture
 def tmp_db(tmp_path, monkeypatch):
-    monkeypatch.setattr(db.cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     db.init_db()
     return tmp_path
 

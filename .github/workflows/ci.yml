@@ -18,6 +18,18 @@ jobs:
   quality:
     name: Lint, Type, Test, Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ntk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -43,6 +55,7 @@ jobs:
       - name: Tests
         env:
           BOT_TOKEN: ci-token
+          TEST_DATABASE_URL: postgresql://postgres:ntk@localhost:5432/postgres
         run: uv run pytest
 
       - name: Validate compose file
@@ -57,6 +70,7 @@ jobs:
           OPENROUTER_MODEL=openai/gpt-6-luna
           ANSWER_PROBABILITY=0.025
           DATA_DIR=/data
+          DATABASE_URL=postgresql://ci@localhost/ci
           EOF
           cp /tmp/ntk.env .env
           docker compose --env-file /tmp/ntk.env -f infra/docker-compose.prod.yml config >/dev/null

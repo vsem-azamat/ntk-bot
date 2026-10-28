@@ -34,14 +34,43 @@ GitHub):
 | `DELTA_TIME` / `ANSWER_PROBABILITY` | optional tuning |
 | `DIGEST_ENABLED` / `DIGEST_CHAT_ID` | optional morning digest switch and target chat |
 | `ALERT_CHAT_ID` / `ALERT_THREAD_ID` | optional; chat (and forum topic) for collector outage / recovery alerts |
+| `DATABASE_URL` | libpq URL of the PostgreSQL database, with `sslmode=verify-full&sslrootcert=/run/ntk/db-ca.crt` |
+| `DATABASE_CA_CERT` | PEM of the CA that signed the database server certificate; deployed as `db-ca.crt` |
 
 ## Runtime
 
 - Stack: `docker compose -f infra/docker-compose.prod.yml --env-file .env`.
-- State lives on a Docker volume mounted at `/data`: `ntk.sqlite`, the trained
-  model files, `.instructions`, and the liveness `heartbeat`.
+- Data lives in PostgreSQL: tables `occupancy`, `weather`, `digest` and
+  `scrape_failures` (one row per failed scrape, so gaps are explained by data),
+  created on the first connection. Columns are `timestamptz`; the app works in
+  naive Prague time.
+- If PostgreSQL is unreachable, samples go to `/data/outbox.sqlite` and are
+  flushed on the next successful write or at startup.
+- The Docker volume at `/data` keeps the trained model files, `.instructions`,
+  the liveness `heartbeat` and `ntk.sqlite`, the pre-PostgreSQL database. It is
+  imported once on startup (idempotent, verified, then marked with
+  `ntk.sqlite.imported`) and kept as a cold copy.
 - Container timezone is `Europe/Prague`, so collection windows and stored
   timestamps are local.
+
+## Backups
+
+The `db-backup` service in the same compose stack runs `pg_dump --format=custom`
+whenever its container starts and then daily at 03:40 UTC into `backups/` next to
+the deploy directory (`ntk-<UTC timestamp>.dump`, mode 600, 30 days). Restore:
+
+Restore with the bot stopped (it caches the series in memory and would keep
+writing during the restore):
+
+```sh
+docker compose -f infra/docker-compose.prod.yml --env-file .env stop bot
+pg_restore --no-owner --clean --if-exists -d "$DATABASE_URL" backups/ntk-<stamp>.dump
+docker compose -f infra/docker-compose.prod.yml --env-file .env start bot
+```
+
+While the bot cannot write to PostgreSQL it buffers samples in
+`/data/outbox.sqlite` and, after three buffered samples in a row, posts an
+"NTK database" alert to the alert chat.
 
 ## Re-training
 

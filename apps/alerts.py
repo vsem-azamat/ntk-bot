@@ -22,6 +22,8 @@ FAILURE_THRESHOLD = 3
 
 @dataclass
 class CollectionMonitor:
+    subject: str = "NTK collector"
+    what: str = "samples failed"
     threshold: int = FAILURE_THRESHOLD
     failures: int = 0
     first_failure: datetime | None = None
@@ -38,7 +40,7 @@ class CollectionMonitor:
             return None
         self.alerted = True
         return (
-            f"NTK collector: {self.failures} samples failed in a row since "
+            f"{self.subject}: {self.failures} {self.what} in a row since "
             f"{self.first_failure:%Y-%m-%d %H:%M}.\nLast error: {self.last_error}"
         )
 
@@ -47,8 +49,8 @@ class CollectionMonitor:
         text = None
         if self.alerted and self.first_failure is not None:
             text = (
-                f"NTK collector recovered at {now:%Y-%m-%d %H:%M} after "
-                f"{self.failures} failed samples (since {self.first_failure:%Y-%m-%d %H:%M})."
+                f"{self.subject} recovered at {now:%Y-%m-%d %H:%M} after "
+                f"{self.failures} {self.what} (since {self.first_failure:%Y-%m-%d %H:%M})."
             )
         self.failures = 0
         self.first_failure = None

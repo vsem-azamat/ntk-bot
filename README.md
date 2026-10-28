@@ -9,7 +9,7 @@ Telegram bot for [@chat_ntk](https://t.me/chat_ntk) — students of the National
 ## Features
 
 - Shows the current number of people in the library (`/ntk`)
-- Continuously records occupancy from the library website into SQLite
+- Continuously records occupancy from the library website into PostgreSQL
 - Plots the day: real data so far + predicted median + p10–p90 range (`/graph`)
 - Predicts occupancy with ML models that also use weather as a signal
 
@@ -40,13 +40,16 @@ Historical weather is backfilled once from [Open-Meteo](https://open-meteo.com/)
 
 The project is managed with [uv](https://docs.astral.sh/uv/).
 
+The bot needs PostgreSQL (any recent version; production runs 18).
+
 ```sh
 uv sync                 # install deps from uv.lock
-echo "BOT_TOKEN=<token>" > .env
+docker run -d --name ntk-pg -p 127.0.0.1:55432:5432 -e POSTGRES_PASSWORD=ntk postgres:18
+printf 'BOT_TOKEN=<token>\nDATABASE_URL=postgresql://postgres:ntk@localhost:55432/postgres\n' > .env
 uv run ntk-bot          # or: uv run python -m bot
 ```
 
-Data is written to `./ntk.sqlite` (override the directory with `DATA_DIR`).
+Tables are created on the first connection. Trained models and the local outbox live in `DATA_DIR` (default `.`).
 
 ### Optional `.env` values
 
@@ -65,7 +68,7 @@ Data is written to `./ntk.sqlite` (override the directory with `DATA_DIR`).
 uv run ruff format .    # format
 uv run ruff check .     # lint
 uv run ty check         # type-check
-uv run pytest           # tests
+TEST_DATABASE_URL=postgresql://postgres:ntk@localhost:55432/postgres uv run pytest   # tests (empty DB per test)
 ```
 
 ## Commands
@@ -77,4 +80,4 @@ uv run pytest           # tests
 
 ## Deployment
 
-Containerised with Docker Compose and deployed via GitHub Actions. Occupancy data is persisted in SQLite on a Docker volume.
+Containerised with Docker Compose and deployed via GitHub Actions. Occupancy, weather and digest state live in PostgreSQL; if the database is unreachable, samples are buffered in a local SQLite outbox and flushed once it is back.

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from aiogram import Router, types
@@ -23,7 +24,7 @@ async def ntk(message: types.Message):
     except Exception:
         logger.exception("Live NTK count failed")
         try:
-            last = db.latest_occupancy()
+            last = await asyncio.to_thread(db.latest_occupancy)
         except Exception:
             logger.exception("Could not read the last stored count")
             last = None

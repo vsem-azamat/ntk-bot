@@ -1,0 +1,39 @@
+#!/bin/sh
+# Daily off-site logical backup of the ntk-bot database, kept on the bot host
+# (the database server has its own backups; this copy survives losing it).
+set -eu
+
+BACKUP_DIR=/backups
+KEEP_DAYS="${BACKUP_KEEP_DAYS:-30}"
+RUN_AT_UTC="${BACKUP_AT_UTC:-03:40}"
+DUMP_TIMEOUT_S=1800
+export PGCONNECT_TIMEOUT=10
+
+backup() {
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  tmp="$BACKUP_DIR/.ntk-$stamp.dump.tmp"
+  if timeout "$DUMP_TIMEOUT_S" pg_dump --format=custom --no-owner --file="$tmp" "$DATABASE_URL"; then
+    chmod 600 "$tmp"
+    mv "$tmp" "$BACKUP_DIR/ntk-$stamp.dump"
+    echo "[db-backup] wrote ntk-$stamp.dump ($(du -h "$BACKUP_DIR/ntk-$stamp.dump" | cut -f1))"
+    find "$BACKUP_DIR" -name 'ntk-*.dump' -mtime +"$KEEP_DAYS" -delete
+  else
+    rm -f "$tmp"
+    echo "[db-backup] pg_dump failed" >&2
+  fi
+}
+
+seconds_until_next_run() {
+  now="$(date -u +%s)"
+  next="$(date -u -d "$(date -u +%Y-%m-%d) $RUN_AT_UTC" +%s)"
+  [ "$next" -le "$now" ] && next=$((next + 86400))
+  echo $((next - now))
+}
+
+mkdir -p "$BACKUP_DIR"
+# A dump whenever the container (re)starts proves credentials and TLS work.
+backup
+while true; do
+  sleep "$(seconds_until_next_run)"
+  backup
+done

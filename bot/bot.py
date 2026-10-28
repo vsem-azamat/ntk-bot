@@ -19,7 +19,13 @@ logger = logging.getLogger(__name__)
 async def on_startup(bot: Bot) -> None:
     await bot.delete_webhook()
 
-    db.init_db()
+    try:
+        await asyncio.to_thread(db.init_db)
+        await asyncio.to_thread(db.import_legacy_sqlite, cnfg.LEGACY_DB_PATH)
+    except Exception:
+        # Keep the bot (and collection, which buffers locally) running; the
+        # schema is created on the first successful connection.
+        logger.exception("Database initialisation failed")
 
     if not cnfg.OPENROUTER_API_KEY:
         logger.warning("OPENROUTER_API_KEY is not set; GPT replies are disabled")
@@ -41,6 +47,7 @@ async def on_startup(bot: Bot) -> None:
 async def on_shutdown(bot: Bot) -> None:
     await bot.delete_webhook()
     await bot.session.close()
+    db.close()
 
 
 async def main() -> None:

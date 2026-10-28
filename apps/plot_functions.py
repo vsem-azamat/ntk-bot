@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 import matplotlib.dates as mdates
@@ -47,12 +48,12 @@ class PlotGraphs:
     async def get_ntk_data(
         self, start_datetime: datetime, end_datetime: datetime
     ) -> tuple[list[datetime], list[int]]:
-        """Get occupancy data from SQLite within the given datetime range."""
+        """Get occupancy data within the given datetime range."""
         from bot import db
 
         datetimes: list[datetime] = []
         quantities: list[int] = []
-        for row_datetime, count in db.fetch_occupancy():
+        for row_datetime, count in await asyncio.to_thread(db.fetch_occupancy):
             if count != 0 and start_datetime <= row_datetime < end_datetime:
                 datetimes.append(row_datetime)
                 quantities.append(count)

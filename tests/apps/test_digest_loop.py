@@ -41,7 +41,6 @@ class FakeBot:
 
 @pytest.fixture
 def digest_db(tmp_path, monkeypatch):
-    monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DIGEST_CHAT_ID", -100)
 
     async def fake_render(now):

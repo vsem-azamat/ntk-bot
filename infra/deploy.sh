@@ -9,7 +9,18 @@ command -v docker >/dev/null 2>&1 || { echo "docker is required on the host" >&2
 docker compose version >/dev/null 2>&1 || { echo "docker compose plugin is required" >&2; exit 1; }
 [ -f "$ENV_FILE" ] || { echo "Missing env file: $ENV_FILE" >&2; exit 1; }
 
+# The db-backup service writes dumps as the deploy user.
+BACKUP_UID="$(id -u)"
+BACKUP_GID="$(id -g)"
+export BACKUP_UID BACKUP_GID
+
 dc() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
+
+# Bind-mounted by the db-backup service; create it as the deploy user so Docker
+# does not create it root-owned.
+mkdir -p "$ROOT_DIR/backups"
+chmod 700 "$ROOT_DIR/backups"
+[ -f "$ROOT_DIR/db-ca.crt" ] || { echo "Missing database CA: $ROOT_DIR/db-ca.crt" >&2; exit 1; }
 
 echo "[deploy] validating compose configuration..."
 dc config >/dev/null

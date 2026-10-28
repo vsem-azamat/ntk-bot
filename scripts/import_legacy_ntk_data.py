@@ -1,4 +1,4 @@
-"""One-off importer: legacy flat ``ntk_data.txt`` -> SQLite.
+"""One-off importer: legacy flat ``ntk_data.txt`` -> the bot database.
 
 Usage (inside the container against the /data volume):
     python scripts/import_legacy_ntk_data.py /data/legacy.txt

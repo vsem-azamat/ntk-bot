@@ -8,7 +8,6 @@ from bot import db
 @pytest.fixture
 def tmp_db(tmp_path, monkeypatch):
     path = tmp_path / "ntk.sqlite"
-    monkeypatch.setattr(db.cnfg, "DB_PATH", str(path))
     db.init_db()
     return path
 
