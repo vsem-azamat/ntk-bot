@@ -157,9 +157,7 @@ def peak_value_error(pred: list[float], actual: list[float]) -> float:
     return abs(float(max(pred)) - float(max(actual)))
 
 
-def peak_time_error_minutes(
-    pred: list[float], actual: list[float], step_minutes: int
-) -> float:
+def peak_time_error_minutes(pred: list[float], actual: list[float], step_minutes: int) -> float:
     """Absolute error between predicted and actual peak time, in minutes."""
     pi = int(np.argmax(pred))
     ai = int(np.argmax(actual))
@@ -525,11 +523,7 @@ def build_matrix(
             row += [a[n] for n in _ASOF_NAMES]
         rows.append(row)
 
-    X = (
-        np.array(rows, dtype=object)
-        if rows
-        else np.empty((0, len(names)), dtype=object)
-    )
+    X = np.array(rows, dtype=object) if rows else np.empty((0, len(names)), dtype=object)
     return Features(X=X, names=names, categorical_indices=cat_idx)
 ```
 
@@ -852,7 +846,9 @@ def test_score_day_returns_all_metric_keys():
     # one row per cut time, each with the full metric set
     assert result
     for r in result:
-        assert {"mae", "peak_value_err", "peak_time_err", "pinball", "coverage", "near_mae"} <= set(r)
+        assert {"mae", "peak_value_err", "peak_time_err", "pinball", "coverage", "near_mae"} <= set(
+            r
+        )
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -907,18 +903,14 @@ def score_day(
 ) -> list[dict]:
     results: list[dict] = []
     for cut in cut_times(test_day):
-        grid, p10, p50, p90 = fit_predict_day(
-            cand, rows, ctx, train_days, test_day, cut, weather
-        )
+        grid, p10, p50, p90 = fit_predict_day(cand, rows, ctx, train_days, test_day, cut, weather)
         actual = _actual_on_grid(grid, rows)
         if actual is None:
             continue
         # Near-term window starts at the cut (or grid start for the cold case).
         start = 0
         if cut is not None:
-            start = min(
-                range(len(grid)), key=lambda i: abs((grid[i] - cut).total_seconds())
-            )
+            start = min(range(len(grid)), key=lambda i: abs((grid[i] - cut).total_seconds()))
         results.append(
             {
                 "cut": "morning" if cut is None else cut.strftime("%H:%M"),
@@ -1145,9 +1137,7 @@ def anchor_band(
             adj = 0.0
         else:
             adj = correction * (decay ** (i - anchor_index))
-        triple = sorted(
-            (max(0.0, p10[i] + adj), max(0.0, p50[i] + adj), max(0.0, p90[i] + adj))
-        )
+        triple = sorted((max(0.0, p10[i] + adj), max(0.0, p50[i] + adj), max(0.0, p90[i] + adj)))
         out10.append(triple[0])
         out50.append(triple[1])
         out90.append(triple[2])
@@ -1307,21 +1297,19 @@ record the group selection implicitly (models are group-specific by column order
 sample as the anchor, and apply `anchor_band`:
 
 ```python
-        from apps.anchor import anchor_band
-        from apps.features import ObsContext
+from apps.anchor import anchor_band
+from apps.features import ObsContext
 
-        rows = drop_closed_hours(db.fetch_occupancy())
-        ctx = ObsContext.from_rows(rows)
-        # ... after computing p10/p50/p90 via catboost or climatology ...
-        today_samples = [(dt, c) for dt, c in ctx.samples_on(target_day.date()) if dt <= target_day]
-        anchor_index = anchor_value = None
-        if today_samples:
-            last_dt, last_c = today_samples[-1]
-            anchor_index = min(
-                range(len(grid)), key=lambda i: abs((grid[i] - last_dt).total_seconds())
-            )
-            anchor_value = float(last_c)
-        p10, p50, p90 = anchor_band(p10, p50, p90, anchor_index, anchor_value)
+rows = drop_closed_hours(db.fetch_occupancy())
+ctx = ObsContext.from_rows(rows)
+# ... after computing p10/p50/p90 via catboost or climatology ...
+today_samples = [(dt, c) for dt, c in ctx.samples_on(target_day.date()) if dt <= target_day]
+anchor_index = anchor_value = None
+if today_samples:
+    last_dt, last_c = today_samples[-1]
+    anchor_index = min(range(len(grid)), key=lambda i: abs((grid[i] - last_dt).total_seconds()))
+    anchor_value = float(last_c)
+p10, p50, p90 = anchor_band(p10, p50, p90, anchor_index, anchor_value)
 ```
 
 Thread `ctx` into the catboost branch (`self._predict_catboost(grid, weather, ctx)`).
