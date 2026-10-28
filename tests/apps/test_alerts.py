@@ -91,3 +91,15 @@ async def test_hung_database_write_is_buffered_without_blocking():
     ):
         await collect_once(bot, CollectionMonitor(), T0)
     buffer.assert_called_once_with(T0, 500)
+
+
+@pytest.mark.asyncio
+async def test_store_failure_never_escapes_the_collector():
+    import sqlite3
+
+    bot = AsyncMock()
+    with (
+        patch("apps.schedule_functions.get_ntk_quantity", AsyncMock(return_value=500)),
+        patch("bot.db.insert_occupancy", side_effect=sqlite3.OperationalError("disk full")),
+    ):
+        await collect_once(bot, CollectionMonitor(), T0)  # must not raise

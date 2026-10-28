@@ -63,17 +63,27 @@ async def collect_once(
             stored = await asyncio.wait_for(
                 asyncio.to_thread(db.insert_occupancy, now, quantity_ntk), _DB_WRITE_TIMEOUT_S
             )
-        except TimeoutError:
+            store_error: BaseException = ConnectionError("PostgreSQL write failed; buffered")
+        except TimeoutError as exc:
             # The database accepted the connection but never answered. Keep the
             # sample locally; a late success of the stuck write is a harmless
             # same-minute upsert when the outbox is flushed.
             logger.warning("Postgres write timed out; buffering sample locally")
-            await asyncio.to_thread(db.buffer_occupancy, now, quantity_ntk)
-            stored = False
+            stored, store_error = False, exc
+            try:
+                await asyncio.to_thread(db.buffer_occupancy, now, quantity_ntk)
+            except Exception as buffer_exc:
+                logger.exception("Could not buffer the sample locally")
+                store_error = buffer_exc
+        except Exception as exc:
+            # Even the local outbox failed (disk full, locked file): the sample is
+            # lost, but the collector must keep running and the alert must fire.
+            logger.exception("Could not store the sample")
+            stored, store_error = False, exc
         if stored:
             texts.append(db_monitor.record_success(now))
         else:
-            texts.append(db_monitor.record_failure(now, ConnectionError("PostgreSQL write failed")))
+            texts.append(db_monitor.record_failure(now, store_error))
     for text in texts:
         if text:
             await send_alert(bot, text)
@@ -88,7 +98,10 @@ async def receive_ntk_data(bot, delta_minutes: int = 20) -> None:
     while True:
         current_time = datetime.now().strftime("%H:%M")
         if current_time in time_list:
-            await collect_once(bot, monitor, datetime.now(), db_monitor)
+            try:
+                await collect_once(bot, monitor, datetime.now(), db_monitor)
+            except Exception:
+                logger.exception("Collector tick failed")
             await asyncio.sleep(delta_minutes * 60 - 60)
         else:
             await asyncio.sleep(1)
