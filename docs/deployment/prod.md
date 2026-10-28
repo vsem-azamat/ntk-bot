@@ -29,8 +29,8 @@ GitHub):
 | `NTK_DEPLOY_DIR` | deploy directory on the host |
 | `BOT_TOKEN` | Telegram bot token |
 | `SUPER_ADMINS` | comma-separated admin Telegram IDs |
-| `OPENROUTER_API_KEY` | optional; empty disables GPT replies |
-| `OPENROUTER_MODEL` | optional, default `openai/gpt-6-luna` |
+| `OPENROUTER_API_KEY` | optional; empty disables LLM replies |
+| `OPENROUTER_MODEL` | optional, default `openai/gpt-6-luna-pro` |
 | `DELTA_TIME` / `ANSWER_PROBABILITY` | optional tuning |
 | `DIGEST_ENABLED` / `DIGEST_CHAT_ID` | optional morning digest switch and target chat |
 | `ALERT_CHAT_ID` / `ALERT_THREAD_ID` | optional; chat (and forum topic) for collector outage / recovery alerts |
@@ -46,7 +46,8 @@ GitHub):
   naive Prague time.
 - If PostgreSQL is unreachable, samples go to `/data/outbox.sqlite` and are
   flushed on the next successful write or at startup.
-- The Docker volume at `/data` keeps the trained model files, `.instructions`,
+- The Docker volume at `/data` keeps the trained model files, the old LLM prompt file
+  `.instructions` (imported once into `settings` when no prompt is stored),
   the liveness `heartbeat` and `ntk.sqlite`, the pre-PostgreSQL database. It is
   imported once on startup (idempotent, verified, then marked with
   `ntk.sqlite.imported`) and kept as a cold copy.

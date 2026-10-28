@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 
+from apps.llm import ensure_settings
 from apps.schedule_functions import (
     daily_maintenance_loop,
     heartbeat_loop,
@@ -11,7 +12,7 @@ from apps.schedule_functions import (
 )
 from bot import db
 from bot.handlers import router
-from config import INSTRUCTIONS_PATH, cnfg
+from config import cnfg
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +28,11 @@ async def on_startup(bot: Bot) -> None:
         # schema is created on the first successful connection.
         logger.exception("Database initialisation failed")
 
+    # Loads the LLM prompt/probability (and imports .instructions once); retried
+    # lazily by the reply handler if the database is unavailable now.
+    await asyncio.to_thread(ensure_settings)
     if not cnfg.OPENROUTER_API_KEY:
-        logger.warning("OPENROUTER_API_KEY is not set; GPT replies are disabled")
-    if not cnfg.INSTRUCTIONS:
-        logger.warning(
-            "Instructions file '%s' is missing; GPT will use an empty system prompt",
-            INSTRUCTIONS_PATH,
-        )
+        logger.warning("OPENROUTER_API_KEY is not set; LLM replies are disabled")
 
     # Background workers; polling starts immediately. Daily maintenance handles
     # weather backfill + model retraining (training only on a cold start or once

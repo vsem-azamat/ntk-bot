@@ -66,6 +66,11 @@ CREATE TABLE IF NOT EXISTS scrape_failures (
     error text NOT NULL
 );
 CREATE INDEX IF NOT EXISTS scrape_failures_ts ON scrape_failures (ts);
+CREATE TABLE IF NOT EXISTS settings (
+    key text PRIMARY KEY,
+    value text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
 """
 
 _pool: ConnectionPool | None = None
@@ -358,6 +363,35 @@ def clear_digest_state() -> None:
     """Forget the active digest (after it has been deleted from the chat)."""
     with _conn() as conn:
         conn.execute("DELETE FROM digest")
+
+
+# >>>>>>>>>> SETTINGS <<<<<<<<<< #
+
+
+def get_setting(key: str) -> str | None:
+    """Runtime setting edited from Telegram (LLM prompt, reply probability)."""
+    with _conn() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = %s", (key,)).fetchone()
+    return row[0] if row else None
+
+
+def set_setting(key: str, value: str) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (%s, %s)"
+            " ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()",
+            (key, value),
+        )
+
+
+def set_settings(values: dict[str, str]) -> None:
+    """Upsert several settings atomically."""
+    with _conn() as conn, conn.transaction(), conn.cursor() as cur:
+        cur.executemany(
+            "INSERT INTO settings (key, value) VALUES (%s, %s)"
+            " ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()",
+            list(values.items()),
+        )
 
 
 # >>>>>>>>>> LEGACY IMPORT <<<<<<<<<< #
