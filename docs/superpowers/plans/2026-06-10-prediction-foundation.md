@@ -267,9 +267,17 @@ from apps.features import FEATURE_NAMES, CATEGORICAL_INDICES, build_features
 
 def test_feature_names_and_categorical_indices():
     assert FEATURE_NAMES == [
-        "minute_sin", "minute_cos", "is_weekend",
-        "yday_sin", "yday_cos", "weekday", "month",
-        "temp", "precip", "cloud", "wind",
+        "minute_sin",
+        "minute_cos",
+        "is_weekend",
+        "yday_sin",
+        "yday_cos",
+        "weekday",
+        "month",
+        "temp",
+        "precip",
+        "cloud",
+        "wind",
     ]
     assert CATEGORICAL_INDICES == [5, 6]
 
@@ -286,8 +294,8 @@ def test_categoricals_are_strings_and_weekend_flag():
     # 2024-03-02 is a Saturday
     feats = build_features([datetime(2024, 3, 2, 12, 0)])
     x = feats.X
-    assert x[0, 5] == "5"      # weekday: Saturday == 5
-    assert x[0, 6] == "3"      # month: March
+    assert x[0, 5] == "5"  # weekday: Saturday == 5
+    assert x[0, 6] == "3"  # month: March
     assert float(x[0, 2]) == 1.0  # is_weekend
 
 
@@ -326,9 +334,17 @@ from datetime import datetime
 import numpy as np
 
 FEATURE_NAMES = [
-    "minute_sin", "minute_cos", "is_weekend",
-    "yday_sin", "yday_cos", "weekday", "month",
-    "temp", "precip", "cloud", "wind",
+    "minute_sin",
+    "minute_cos",
+    "is_weekend",
+    "yday_sin",
+    "yday_cos",
+    "weekday",
+    "month",
+    "temp",
+    "precip",
+    "cloud",
+    "wind",
 ]
 CATEGORICAL_INDICES = [5, 6]
 
@@ -722,7 +738,7 @@ from apps.predictModels import drop_closed_hours, time_split
 def test_drop_closed_hours_removes_zero_counts():
     rows = [
         (datetime(2024, 3, 1, 9, 0), 42),
-        (datetime(2024, 3, 1, 9, 20), 0),   # closed -> dropped
+        (datetime(2024, 3, 1, 9, 20), 0),  # closed -> dropped
         (datetime(2024, 3, 1, 10, 10), 7),
     ]
     assert drop_closed_hours(rows) == [
@@ -963,9 +979,7 @@ from datetime import datetime, timedelta
 from config import cnfg
 
 
-async def test_predict_day_falls_back_to_baseline_and_returns_monotone_band(
-    tmp_path, monkeypatch
-):
+async def test_predict_day_falls_back_to_baseline_and_returns_monotone_band(tmp_path, monkeypatch):
     monkeypatch.setattr(cnfg, "DB_PATH", str(tmp_path / "ntk.sqlite"))
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))
     from bot import db

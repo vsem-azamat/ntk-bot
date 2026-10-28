@@ -40,6 +40,6 @@ async def get_gpt_response(message: str) -> str | None:
             response.raise_for_status()
             data = await response.json()
         return data["choices"][0]["message"]["content"]
-    except (aiohttp.ClientError, KeyError, IndexError, TypeError):
+    except aiohttp.ClientError, KeyError, IndexError, TypeError:
         logger.exception("OpenRouter request failed")
         return None

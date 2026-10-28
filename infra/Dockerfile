@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim AS builder
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 WORKDIR /app
@@ -9,7 +9,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY . .
 RUN uv sync --frozen --no-dev
 
-FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS runtime
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim AS runtime
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH=/app \
     MPLBACKEND=Agg \

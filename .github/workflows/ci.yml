@@ -54,7 +54,7 @@ jobs:
           SUPER_ADMINS=
           DELTA_TIME=20
           OPENROUTER_API_KEY=
-          OPENROUTER_MODEL=openai/gpt-4o
+          OPENROUTER_MODEL=openai/gpt-6-luna
           ANSWER_PROBABILITY=0.025
           DATA_DIR=/data
           EOF

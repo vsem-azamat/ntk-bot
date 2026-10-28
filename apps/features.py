@@ -96,7 +96,7 @@ class ObsContext:
     _peaks: list[int] | None = field(default=None, compare=False, repr=False)
 
     @classmethod
-    def from_rows(cls, rows: list[tuple[datetime, int]]) -> "ObsContext":
+    def from_rows(cls, rows: list[tuple[datetime, int]]) -> ObsContext:
         by_day: dict = defaultdict(list)
         for dt, count in rows:
             if count > 0:
@@ -126,7 +126,7 @@ class ObsContext:
         window = self._peaks[max(0, i - trailing_days) : i]
         return float(np.median(window)) if window else 0.0
 
-    def truncated(self, day: date, cut: "datetime | None") -> "ObsContext":
+    def truncated(self, day: date, cut: datetime | None) -> ObsContext:
         """Return a copy where ``day``'s samples are limited to those at or before
         ``cut`` (or the day removed entirely when ``cut`` is None). Other days are
         shared by reference. Cheap: only the one day's list is rebuilt."""
@@ -189,7 +189,7 @@ def asof_features(now: datetime, ctx: ObsContext) -> dict:
 
 def build_matrix(
     timestamps: list[datetime],
-    ctx: "ObsContext | None" = None,
+    ctx: ObsContext | None = None,
     weather: dict[datetime, WeatherRow] | None = None,
     groups: tuple[str, ...] = ("base", "regime", "asof"),
 ) -> Features:

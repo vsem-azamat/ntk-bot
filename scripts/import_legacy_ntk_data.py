@@ -27,7 +27,7 @@ def import_file(path: str) -> tuple[int, int]:
                 ts_part, count_part = row.split(" - ", 1)
                 ts = datetime.strptime(ts_part.strip(), _TS_FORMAT)
                 people = int(count_part.strip())
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 skipped += 1
                 continue
             db.insert_occupancy(ts, people)
