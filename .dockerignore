@@ -18,3 +18,8 @@ docs
 tests
 *.md
 !README.md
+.worktrees
+tmp
+.ruff_cache
+.pytest_cache
+.mypy_cache
