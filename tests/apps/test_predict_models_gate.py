@@ -1,4 +1,4 @@
-from apps.predictModels import better_than_baseline, choose_model
+from apps.forecaster import BASELINE, CATBOOST, better_than_baseline, choose_model
 
 
 def test_catboost_wins_when_lower_error():
@@ -22,29 +22,25 @@ def test_catboost_loses_when_worse_overall():
 def test_incumbent_kept_on_marginal_loss():
     cat = {"mae": 101.6, "near_mae": 102.1}
     clim = {"mae": 98.4, "near_mae": 101.7}
-    assert choose_model(cat, clim, "catboost") == "catboost"
+    assert choose_model(cat, clim, CATBOOST) == CATBOOST
     assert (
-        choose_model(
-            {"mae": 98.4, "near_mae": 90.0}, {"mae": 101.6, "near_mae": 99.0}, "climatology"
-        )
-        == "climatology"
+        choose_model({"mae": 98.4, "near_mae": 90.0}, {"mae": 101.6, "near_mae": 99.0}, BASELINE)
+        == BASELINE
     )
 
 
 def test_switch_on_clear_win():
     assert (
-        choose_model({"mae": 120.0, "near_mae": 99.0}, {"mae": 100.0, "near_mae": 90.0}, "catboost")
-        == "climatology"
+        choose_model({"mae": 120.0, "near_mae": 99.0}, {"mae": 100.0, "near_mae": 90.0}, CATBOOST)
+        == BASELINE
     )
     assert (
-        choose_model(
-            {"mae": 80.0, "near_mae": 70.0}, {"mae": 100.0, "near_mae": 90.0}, "climatology"
-        )
-        == "catboost"
+        choose_model({"mae": 80.0, "near_mae": 70.0}, {"mae": 100.0, "near_mae": 90.0}, BASELINE)
+        == CATBOOST
     )
 
 
 def test_incumbent_catboost_dropped_on_near_term_regression():
     cat = {"mae": 100.0, "near_mae": 150.0}
     clim = {"mae": 97.0, "near_mae": 90.0}
-    assert choose_model(cat, clim, "catboost") == "climatology"
+    assert choose_model(cat, clim, CATBOOST) == BASELINE

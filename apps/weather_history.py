@@ -1,13 +1,12 @@
-"""Open-meteo weather ingest. Owns the single definition of the model's weather
-variables so archive (training) and forecast (prediction) stay consistent.
+"""Open-meteo weather ingest: hourly archive weather stored next to the
+occupancy. The forecaster does not use it (weather features did not lower the
+backtest error, see docs/prediction.md); the history is kept for analysis.
 """
 
 import logging
 from datetime import datetime, timedelta
 
 import aiohttp
-
-from apps.features import WeatherRow
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +15,9 @@ _LAT = 50.1038
 _LON = 14.3906
 _TZ = "Europe/Berlin"
 
-# The four variables the model consumes, in the order features.py expects them.
+# The four stored variables, in the column order of the weather table.
 _HOURLY = "temperature_2m,precipitation,cloudcover,windspeed_10m"
 _ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
-_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 
 
 async def _get_json(url: str, params: dict) -> dict:
@@ -89,18 +87,3 @@ async def backfill() -> int:
     if rows:
         db.upsert_weather(rows)
     return len(rows)
-
-
-async def forecast_weather(target_day: datetime) -> dict[datetime, WeatherRow]:
-    """Return ``{hour: (temp, precip, cloud, wind)}`` forecast for ``target_day``."""
-    payload = await _get_json(
-        _FORECAST_URL,
-        {
-            "latitude": _LAT,
-            "longitude": _LON,
-            "timezone": _TZ,
-            "hourly": _HOURLY,
-            "forecast_days": 2,
-        },
-    )
-    return {dt: (t, p, c, w) for dt, t, p, c, w in _payload_to_rows(payload)}

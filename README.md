@@ -11,30 +11,19 @@ Telegram bot for [@chat_ntk](https://t.me/chat_ntk) — students of the National
 - Shows the current number of people in the library (`/ntk`)
 - Continuously records occupancy from the library website into PostgreSQL
 - Plots the day: real data so far + predicted median + p10–p90 range (`/graph`)
-- Predicts occupancy with ML models that also use weather as a signal
+- Predicts the rest of the day with a CatBoost model that learns how today deviates from recent days of the same type
 
 **Planned:** morning digest (auto-updating, self-deleting), anti-bot filter.
 
 ## How prediction works
 
-Every occupancy sample is stored permanently. For each timestamp the model builds a feature vector and predicts the number of people:
+The forecast starts from a **norm**: the median curve of the last three days of the same type (Mon–Thu, Fri, Sat, Sun/holiday). Once the library is open, today's samples so far tell how busy today is compared with that norm, and the norm is rescaled to that level (*shape × level*).
 
-| feature group | features |
-|:---|:---|
-| time (cyclical) | minute-of-day (sin/cos), day-of-year (sin/cos) |
-| calendar | weekday, month, weekend flag |
-| weather | temperature, precipitation, cloud cover, wind |
+A [CatBoost](https://catboost.ai/) model then predicts how the real count will deviate from this baseline, from the time of day, the calendar, the norm and what has been observed today. Because it predicts a ratio rather than absolute counts, it follows semester/exam/break swings and year-over-year growth that a model of absolute counts cannot extrapolate. The median is anchored to the latest real sample, and the p10–p90 band comes from the model's recent errors at the same horizon, so it holds about 80 % of real values (0.76–0.85 per time of day in the backtest).
 
-Instead of a single number, three **quantile** models are trained, so the bot shows a range rather than a point estimate:
+The model is retrained daily and served only if it beats the shape × level baseline on a walk-forward replay of the last 12 weeks; otherwise the bot shows the baseline. Only samples from opening time (08:00 on weekdays, 10:00 at weekends and Czech holidays) until midnight are used, because before opening the counter still shows the previous evening's residue.
 
-- **p50** — the median ("usually about this many people")
-- **p10 / p90** — the central 80% range ("normally somewhere between these")
-
-The models are [CatBoost](https://catboost.ai/) regressors (`loss=Quantile`), validated on a **time-based holdout** (the most recent weeks, never shuffled — so the past can't leak future data) and benchmarked against a **recent-days baseline** (median curve of the last six days of the same type: Mon–Thu, Fri, Sat, Sun/holiday). The served model only changes when the challenger beats the incumbent by 5 %, so the forecast does not flip shape from day to day; on a cold start the bot uses the baseline.
-
-Only samples from opening time (08:00 on weekdays, 10:00 on weekends and Czech holidays) until midnight are used: after closing the library counter keeps a residue of a few hundred "people" until it resets at opening.
-
-Historical weather is backfilled once from [Open-Meteo](https://open-meteo.com/) and refreshed daily; the forecast for the target day feeds the prediction.
+Details, the backtest method and the current numbers: [docs/prediction.md](docs/prediction.md).
 
 ## Run locally
 

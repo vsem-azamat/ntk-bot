@@ -1,60 +1,83 @@
-import math
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 
-from apps.features import CATEGORICAL_INDICES, FEATURE_NAMES, WeatherRow, build_features
+import numpy as np
+import pytest
 
+from apps.features import (
+    feature_names,
+    from_target,
+    state_rows,
+    to_target,
+    training_rows,
+)
+from apps.level import day_state
+from apps.reference import DayCurves, bucket_of
+from tests.apps.test_reference import _day
 
-def test_feature_names_and_categorical_indices():
-    assert FEATURE_NAMES == [
-        "minute_sin",
-        "minute_cos",
-        "is_weekend",
-        "yday_sin",
-        "yday_cos",
-        "weekday",
-        "month",
-        "temp",
-        "precip",
-        "cloud",
-        "wind",
-    ]
-    assert CATEGORICAL_INDICES == [5, 6]
+GROUPS = ("calendar", "norm", "today")
+MONDAYS = [date(2024, 3, 4) + timedelta(weeks=i) for i in range(4)]
 
 
-def test_cyclical_minute_encoding_wraps_around():
-    feats = build_features([datetime(2024, 3, 1, 0, 0), datetime(2024, 3, 1, 23, 59)])
-    x = feats.X
-    assert abs(float(x[0, 0]) - float(x[1, 0])) < 0.01  # minute_sin
-    assert abs(float(x[0, 1]) - float(x[1, 1])) < 0.01  # minute_cos
+def _history(last_level: int = 300):
+    rows = [r for d in MONDAYS[:-1] for r in _day(d, 200)] + _day(MONDAYS[-1], last_level)
+    by_day: dict[date, list] = {}
+    for dt, c in rows:
+        by_day.setdefault(dt.date(), []).append((dt, c))
+    return rows, by_day
 
 
-def test_categoricals_are_strings_and_weekend_flag():
-    # 2024-03-02 is a Saturday
-    feats = build_features([datetime(2024, 3, 2, 12, 0)])
-    x = feats.X
-    assert x[0, 5] == "5"  # weekday: Saturday == 5
-    assert x[0, 6] == "3"  # month: March
-    assert float(x[0, 2]) == 1.0  # is_weekend
+def test_target_roundtrip():
+    y = np.array([0.0, 10.0, 500.0])
+    base = np.array([5.0, 50.0, 400.0])
+    assert np.allclose(from_target(to_target(y, base), base), y)
+    assert to_target(np.array([400.0]), np.array([400.0]))[0] == 0.0
 
 
-def test_empty_timestamps_has_correct_2d_shape():
-    feats = build_features([])
-    assert feats.X.shape == (0, len(FEATURE_NAMES))
-    assert feats.X.dtype == object
+def test_unknown_group_is_rejected():
+    with pytest.raises(ValueError):
+        feature_names(("calendar", "nope"))
 
 
-def test_cyclical_yday_encoding_wraps_around():
-    x = build_features([datetime(2024, 1, 1, 12, 0), datetime(2024, 12, 31, 12, 0)]).X
-    assert abs(float(x[0, 3]) - float(x[1, 3])) < 0.05  # yday_sin
-    assert abs(float(x[0, 4]) - float(x[1, 4])) < 0.05  # yday_cos
+def test_rows_match_feature_names():
+    rows, by_day = _history()
+    curves = DayCurves(rows)
+    state = day_state(curves, MONDAYS[-1], by_day[MONDAYS[-1]], None)
+    X = state_rows(state, np.array([60, 80]), GROUPS)
+    assert X.shape == (2, len(feature_names(GROUPS)))
+    has_today = feature_names(GROUPS).index("has_today")
+    assert (X[:, has_today] == 0).all()
 
 
-def test_weather_join_fills_matching_hour_and_nans_when_missing():
-    ts = datetime(2024, 3, 1, 9, 30)
-    weather: dict[datetime, WeatherRow] = {datetime(2024, 3, 1, 9, 0): (5.0, 0.0, 50.0, 3.0)}
-    x = build_features([ts], weather).X
-    assert [float(v) for v in x[0, 7:11]] == [5.0, 0.0, 50.0, 3.0]
+def test_training_rows_only_target_samples_after_the_cut():
+    rows, by_day = _history()
+    curves = DayCurves(rows)
+    ts = training_rows(curves, by_day, [MONDAYS[-1]], GROUPS, (time(12, 0),))
+    X, z, base = ts.X, ts.z, ts.base
+    after = [dt for dt, _ in by_day[MONDAYS[-1]] if dt.time() > time(12, 0)]
+    assert len(z) == len(after)
+    # Every target bucket lies after the last observed bucket.
+    horizon = feature_names(GROUPS).index("horizon_min")
+    assert (X[:, horizon] > 0).all()
+    assert np.allclose(from_target(z, base), 300)
 
-    x_missing = build_features([ts], {}).X
-    assert all(math.isnan(float(v)) for v in x_missing[0, 7:11])
-    assert x.dtype == object
+
+def test_training_rows_do_not_see_the_future():
+    """Changing samples after the cut changes the labels, never the features."""
+    rows, by_day = _history()
+    curves = DayCurves(rows)
+    X1 = training_rows(curves, by_day, [MONDAYS[-1]], GROUPS, (time(12, 0),)).X
+    noon = datetime.combine(MONDAYS[-1], time(12, 0))
+    rows2 = [(dt, c * 3 if dt > noon else c) for dt, c in rows]
+    by_day2 = dict(by_day)
+    by_day2[MONDAYS[-1]] = [(dt, c) for dt, c in rows2 if dt.date() == MONDAYS[-1]]
+    X2 = training_rows(DayCurves(rows2), by_day2, [MONDAYS[-1]], GROUPS, (time(12, 0),)).X
+    assert np.array_equal(X1, X2, equal_nan=True)
+
+
+def test_norm_features_ignore_the_target_day():
+    rows, _ = _history(last_level=5000)
+    curves = DayCurves(rows)
+    state = day_state(curves, MONDAYS[-1], [], None)
+    norm = feature_names(GROUPS).index("norm")
+    X = state_rows(state, np.array([bucket_of(datetime(2024, 1, 1, 12))]), GROUPS)
+    assert X[0, norm] == 200
