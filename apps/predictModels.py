@@ -164,7 +164,7 @@ class PredictModels:
         persist both the models and the ship decision."""
         from bot import db
 
-        rows = usable_samples(db.fetch_occupancy())
+        rows = usable_samples(await asyncio.to_thread(db.fetch_occupancy))
         if len(rows) <= 50:
             logger.info("Not enough data to train (%d rows); baseline only", len(rows))
             self._write_choice("climatology")
@@ -175,8 +175,8 @@ class PredictModels:
             self._write_choice("climatology")
             return
 
-        weather = db.fetch_weather(
-            rows[0][0].replace(minute=0, second=0, microsecond=0), rows[-1][0]
+        weather = await asyncio.to_thread(
+            db.fetch_weather, rows[0][0].replace(minute=0, second=0, microsecond=0), rows[-1][0]
         )
 
         train_days = sorted({dt.date() for dt, _ in train})
@@ -289,7 +289,7 @@ class PredictModels:
 
         target_day = target_day or datetime.now()
         grid = _grid(target_day)
-        rows = usable_samples(db.fetch_occupancy())
+        rows = usable_samples(await asyncio.to_thread(db.fetch_occupancy))
         ctx = ObsContext.from_rows(rows)
 
         use_catboost = self._read_choice() == "catboost" and self._catboost_available()

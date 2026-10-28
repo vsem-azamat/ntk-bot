@@ -82,3 +82,51 @@ def test_scrape_failures_are_recorded():
     db.record_scrape_failure(datetime(2026, 10, 21, 17, 40), "ConnectionTimeoutError: techlib")
     with db._conn() as conn:
         assert conn.execute("SELECT count(*) FROM scrape_failures").fetchone() == (1,)
+
+
+def test_non_operational_error_is_buffered_too():
+    with db._conn() as conn:
+        conn.execute("DROP TABLE occupancy")  # e.g. mid-restore
+    assert db.insert_occupancy(datetime(2026, 10, 22, 10, 0), 300) is False
+    assert db.buffered_count() == 1
+    db.close()  # schema is recreated on the next connection
+    assert db.insert_occupancy(datetime(2026, 10, 22, 10, 20), 320) is True
+    assert db.buffered_count() == 0
+    assert [p for _, p in db.fetch_occupancy()] == [300, 320]
+
+
+def test_cache_sees_rows_written_by_someone_else():
+    db.insert_occupancy(datetime(2026, 10, 2, 9, 0), 1)
+    assert len(db.fetch_occupancy()) == 1
+    with db._conn() as conn:  # an older row from another process / restore
+        conn.execute("INSERT INTO occupancy VALUES ('2026-10-01 09:00', 5)")
+    assert db.fetch_occupancy() == [
+        (datetime(2026, 10, 1, 9, 0), 5),
+        (datetime(2026, 10, 2, 9, 0), 1),
+    ]
+
+
+def test_cache_served_when_database_unreachable(monkeypatch):
+    db.insert_occupancy(datetime(2026, 10, 2, 9, 0), 1)
+    assert db.fetch_occupancy()
+    monkeypatch.setattr(
+        db, "_conn", lambda: (_ for _ in ()).throw(__import__("psycopg").OperationalError("down"))
+    )
+    assert db.fetch_occupancy() == [(datetime(2026, 10, 2, 9, 0), 1)]
+
+
+def test_legacy_spring_forward_collision_does_not_block_import(tmp_path):
+    legacy = tmp_path / "ntk.sqlite"
+    with sqlite3.connect(legacy) as conn:
+        conn.execute("CREATE TABLE occupancy (ts TEXT PRIMARY KEY, people INTEGER)")
+        conn.execute(
+            "CREATE TABLE weather (ts TEXT PRIMARY KEY, temp REAL, precip REAL, cloud REAL, wind REAL)"
+        )
+        # 02:20 does not exist on 2024-03-31 in Prague; PostgreSQL maps it to 03:20.
+        conn.executemany(
+            "INSERT INTO occupancy VALUES (?, ?)",
+            [("2024-03-31 02:20", 1), ("2024-03-31 03:20", 2)],
+        )
+    assert db.import_legacy_sqlite(str(legacy)) == (2, 0)
+    assert Path(f"{legacy}.imported").exists()
+    assert not db.legacy_import_pending(str(legacy))

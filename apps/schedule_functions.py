@@ -11,6 +11,10 @@ from config import cnfg
 
 logger = logging.getLogger(__name__)
 
+_IMPORT_RETRY_S = 10 * 60
+# Upper bound for one sample write, well under the collection interval.
+_DB_WRITE_TIMEOUT_S = 30
+
 
 def _touch_heartbeat() -> None:
     """Update the liveness file the container healthcheck inspects."""
@@ -32,55 +36,93 @@ async def heartbeat_loop(interval_seconds: float = 30) -> None:
         await asyncio.sleep(interval_seconds)
 
 
-async def collect_once(bot, monitor: CollectionMonitor, now: datetime) -> None:
-    """Take one sample; feed the outcome to ``monitor`` and send any alert it raises."""
+def database_monitor() -> CollectionMonitor:
+    """Monitor for samples that had to be buffered locally (database down)."""
+    return CollectionMonitor(subject="NTK database", what="samples buffered locally")
+
+
+async def collect_once(
+    bot, monitor: CollectionMonitor, now: datetime, db_monitor: CollectionMonitor | None = None
+) -> None:
+    """Take one sample; feed the outcome to ``monitor`` (scrape) and ``db_monitor``
+    (storage) and send any alert they raise. Database calls run in a worker thread
+    so a slow network to the database never blocks the bot's event loop."""
     from bot import db  # local import avoids a circular import at module load
 
+    db_monitor = db_monitor or database_monitor()
+    texts: list[str | None] = []
     try:
         quantity_ntk = await get_ntk_quantity()
-        db.insert_occupancy(now, quantity_ntk)
     except Exception as exc:
         logger.exception("Failed to collect NTK occupancy data")
-        db.record_scrape_failure(now, f"{type(exc).__name__}: {exc}")
-        text = monitor.record_failure(now, exc)
+        await asyncio.to_thread(db.record_scrape_failure, now, f"{type(exc).__name__}: {exc}")
+        texts.append(monitor.record_failure(now, exc))
     else:
-        text = monitor.record_success(now)
-    if text:
-        await send_alert(bot, text)
+        texts.append(monitor.record_success(now))
+        try:
+            stored = await asyncio.wait_for(
+                asyncio.to_thread(db.insert_occupancy, now, quantity_ntk), _DB_WRITE_TIMEOUT_S
+            )
+        except TimeoutError:
+            # The database accepted the connection but never answered. Keep the
+            # sample locally; a late success of the stuck write is a harmless
+            # same-minute upsert when the outbox is flushed.
+            logger.warning("Postgres write timed out; buffering sample locally")
+            await asyncio.to_thread(db.buffer_occupancy, now, quantity_ntk)
+            stored = False
+        if stored:
+            texts.append(db_monitor.record_success(now))
+        else:
+            texts.append(db_monitor.record_failure(now, ConnectionError("PostgreSQL write failed")))
+    for text in texts:
+        if text:
+            await send_alert(bot, text)
 
 
 async def receive_ntk_data(bot, delta_minutes: int = 20) -> None:
     """Collect occupancy data from the NTK website every ``delta_minutes``."""
     time_list = await generate_time_list(delta_minutes=delta_minutes)
     monitor = CollectionMonitor()
+    db_monitor = database_monitor()
 
     while True:
         current_time = datetime.now().strftime("%H:%M")
         if current_time in time_list:
-            await collect_once(bot, monitor, datetime.now())
+            await collect_once(bot, monitor, datetime.now(), db_monitor)
             await asyncio.sleep(delta_minutes * 60 - 60)
         else:
             await asyncio.sleep(1)
 
 
 async def daily_maintenance_loop(interval_seconds: float = 24 * 60 * 60) -> None:
-    """Once a day: refresh weather, then retrain models.
+    """Once a day: finish a pending legacy import, refresh weather, retrain.
 
     Retraining runs on the first tick only for a cold start (no model yet); a
     plain restart does not trigger an expensive retrain. Subsequent daily ticks
-    always retrain so the model tracks fresh data.
+    always retrain so the model tracks fresh data. While the pre-PostgreSQL
+    history has not been imported yet, retraining is skipped: a model trained on
+    a few days would replace a good one.
     """
     from apps.predictModels import predictModels
+    from bot import db
 
     first = True
     while True:
+        if db.legacy_import_pending(cnfg.LEGACY_DB_PATH):
+            try:
+                await asyncio.to_thread(db.import_legacy_sqlite, cnfg.LEGACY_DB_PATH)
+            except Exception:
+                logger.exception("Legacy SQLite import failed; will retry")
+
         try:
             written = await backfill()
             logger.info("Weather backfill wrote %d rows", written)
         except Exception:
             logger.exception("Weather backfill failed")
 
-        if not first or not predictModels.has_trained():
+        if db.legacy_import_pending(cnfg.LEGACY_DB_PATH):
+            logger.warning("Legacy history not imported yet; skipping retrain")
+        elif not first or not predictModels.has_trained():
             try:
                 await predictModels.learn_models()
                 logger.info("Models retrained")
@@ -88,14 +130,16 @@ async def daily_maintenance_loop(interval_seconds: float = 24 * 60 * 60) -> None
                 logger.exception("Model retrain failed")
         first = False
 
-        await asyncio.sleep(interval_seconds)
+        # Retry a pending legacy import soon instead of in a day.
+        pending = db.legacy_import_pending(cnfg.LEGACY_DB_PATH)
+        await asyncio.sleep(_IMPORT_RETRY_S if pending else interval_seconds)
 
 
 async def _digest_tick(bot, now: datetime) -> None:
     """Run one digest iteration: re-derive the action from the clock + stored
     state and post / refresh / delete accordingly.
 
-    Restart-safe: state lives in SQLite, so the action is a pure function of the
+    Restart-safe: state lives in the database, so the action is a pure function of the
     current time and the persisted row.
     """
     from datetime import date
@@ -106,7 +150,7 @@ async def _digest_tick(bot, now: datetime) -> None:
     from apps.digest import DigestAction, DigestState, decide_digest_action, render
     from bot import db
 
-    row = db.get_digest_state()
+    row = await asyncio.to_thread(db.get_digest_state)
     state = DigestState(date.fromisoformat(row[0]), row[1], row[2], row[3]) if row else None
     action = decide_digest_action(now, state)
 
@@ -118,8 +162,12 @@ async def _digest_tick(bot, now: datetime) -> None:
             caption=caption,
             parse_mode="HTML",
         )
-        db.save_digest_state(
-            now.date().isoformat(), cnfg.DIGEST_CHAT_ID, message.message_id, now.hour
+        await asyncio.to_thread(
+            db.save_digest_state,
+            now.date().isoformat(),
+            cnfg.DIGEST_CHAT_ID,
+            message.message_id,
+            now.hour,
         )
     elif action is DigestAction.UPDATE and state is not None:
         image, caption = await render(now)
@@ -143,14 +191,20 @@ async def _digest_tick(bot, now: datetime) -> None:
                 logger.warning("Digest edit failed; keeping existing message: %s", exc)
         # Transient (e.g. network) errors propagate to the caller's handler so
         # the hour is NOT marked done and the edit is retried on the next tick.
-        db.save_digest_state(state.post_date.isoformat(), state.chat_id, state.message_id, now.hour)
+        await asyncio.to_thread(
+            db.save_digest_state,
+            state.post_date.isoformat(),
+            state.chat_id,
+            state.message_id,
+            now.hour,
+        )
     elif action is DigestAction.DELETE and state is not None:
         try:
             await bot.delete_message(state.chat_id, state.message_id)
         except Exception:
             logger.exception("Digest delete failed; forgetting the message anyway")
         finally:
-            db.clear_digest_state()
+            await asyncio.to_thread(db.clear_digest_state)
 
 
 async def morning_digest_loop(bot, interval_seconds: float = 60) -> None:

@@ -15,6 +15,13 @@ from config import cnfg
 _TABLES = ("occupancy", "weather", "digest", "scrape_failures")
 
 
+def pytest_sessionstart(session):
+    if not os.environ.get("TEST_DATABASE_URL"):
+        pytest.exit(
+            "TEST_DATABASE_URL is not set; the tests need a PostgreSQL database (see above)", 2
+        )
+
+
 @pytest.fixture(autouse=True)
 def _fresh_database(tmp_path, monkeypatch):
     monkeypatch.setattr(cnfg, "DATA_DIR", str(tmp_path))

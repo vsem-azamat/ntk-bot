@@ -6,6 +6,7 @@ unit-tested without Telegram, and so the loop stays restart-safe: state lives in
 SQLite and every tick simply re-derives the right action from the clock.
 """
 
+import asyncio
 import io
 from dataclasses import dataclass
 from datetime import date, datetime, time
@@ -95,4 +96,4 @@ async def render(now: datetime) -> tuple[bytes, str]:
     buffer.seek(0)
 
     forecast = await predictModels.predict_day(now)
-    return buffer.read(), build_caption(forecast, current_count(now))
+    return buffer.read(), build_caption(forecast, await asyncio.to_thread(current_count, now))

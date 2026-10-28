@@ -56,12 +56,21 @@ GitHub):
 ## Backups
 
 The `db-backup` service in the same compose stack runs `pg_dump --format=custom`
-right after every deploy and then daily at 03:40 UTC into `backups/` next to
+whenever its container starts and then daily at 03:40 UTC into `backups/` next to
 the deploy directory (`ntk-<UTC timestamp>.dump`, mode 600, 30 days). Restore:
 
+Restore with the bot stopped (it caches the series in memory and would keep
+writing during the restore):
+
 ```sh
+docker compose -f infra/docker-compose.prod.yml --env-file .env stop bot
 pg_restore --no-owner --clean --if-exists -d "$DATABASE_URL" backups/ntk-<stamp>.dump
+docker compose -f infra/docker-compose.prod.yml --env-file .env start bot
 ```
+
+While the bot cannot write to PostgreSQL it buffers samples in
+`/data/outbox.sqlite` and, after three buffered samples in a row, posts an
+"NTK database" alert to the alert chat.
 
 ## Re-training
 

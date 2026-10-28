@@ -34,6 +34,8 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/opt/db-backup.sh"]
+    # Dumps belong to the deploy user on the host, not root.
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
     volumes:

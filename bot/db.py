@@ -28,6 +28,20 @@ logger = logging.getLogger(__name__)
 _TS_FORMAT = "%Y-%m-%d %H:%M"
 _TZ = "Europe/Prague"
 _POOL_TIMEOUT_S = 10
+# The database is reached over the internet. Without these, a silently dropped
+# route leaves a query blocked for ~15 min of TCP retransmits (the pool timeout
+# only bounds *acquiring* a connection). With them a dead peer surfaces as an
+# OperationalError within ~15 s and the sample goes to the outbox.
+_CONNECT_KWARGS = {
+    "autocommit": True,
+    "connect_timeout": 5,
+    "tcp_user_timeout": 15_000,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 3,
+    "options": f"-c timezone={_TZ} -c statement_timeout=60000",
+}
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS occupancy (
@@ -73,7 +87,8 @@ def _get_pool() -> ConnectionPool:
                 min_size=1,
                 max_size=4,
                 timeout=_POOL_TIMEOUT_S,
-                kwargs={"autocommit": True, "options": f"-c timezone={_TZ}"},
+                kwargs=dict(_CONNECT_KWARGS),
+                check=ConnectionPool.check_connection,
                 open=True,
             )
         return _pool
@@ -119,9 +134,11 @@ class _OccupancyCache:
     """In-process copy of the occupancy series, refreshed incrementally.
 
     The forecaster, plot and digest each read the whole series; re-downloading
-    ~100k rows over the network on every /graph is wasteful. Only the latest
-    minute is ever overwritten (same-minute re-insert), so re-reading from the
-    last cached timestamp keeps the copy exact."""
+    ~100k rows over the network on every /graph is wasteful. The bot only ever
+    overwrites the latest minute, so re-reading from the last cached timestamp
+    keeps the copy exact; a cheap row-count check catches writes made by anyone
+    else (imports, restores, manual fixes) and triggers a full reload. If the
+    database is unreachable, the last good copy is served."""
 
     def __init__(self) -> None:
         self._rows: list[tuple[datetime, int]] = []
@@ -132,17 +149,30 @@ class _OccupancyCache:
             self._rows = []
 
     def fetch(self) -> list[tuple[datetime, int]]:
-        with self._lock, _conn() as conn:
-            if self._rows:
-                last = self._rows[-1][0]
-                fresh = conn.execute(
-                    "SELECT ts, people FROM occupancy WHERE ts >= %s ORDER BY ts", (last,)
-                ).fetchall()
-                self._rows = [r for r in self._rows if r[0] < last]
-            else:
-                fresh = conn.execute("SELECT ts, people FROM occupancy ORDER BY ts").fetchall()
-            self._rows.extend((_naive(ts), people) for ts, people in fresh)
+        with self._lock:
+            try:
+                with _conn() as conn:
+                    self._refresh(conn)
+            except psycopg.Error:
+                if not self._rows:
+                    raise
+                logger.warning("Occupancy read failed; serving the cached copy", exc_info=True)
             return list(self._rows)
+
+    def _refresh(self, conn: psycopg.Connection) -> None:
+        if self._rows:
+            last = self._rows[-1][0]
+            fresh = conn.execute(
+                "SELECT ts, people FROM occupancy WHERE ts >= %s ORDER BY ts", (last,)
+            ).fetchall()
+            rows = [r for r in self._rows if r[0] < last]
+            rows.extend((_naive(ts), people) for ts, people in fresh)
+            total = conn.execute("SELECT count(*) FROM occupancy").fetchone()
+            if total is not None and total[0] == len(rows):
+                self._rows = rows
+                return
+        fresh = conn.execute("SELECT ts, people FROM occupancy ORDER BY ts").fetchall()
+        self._rows = [(_naive(ts), people) for ts, people in fresh]
 
 
 _cache = _OccupancyCache()
@@ -177,26 +207,46 @@ def flush_outbox() -> int:
             return 0
         _write_occupancy([(datetime.strptime(ts, _TS_FORMAT), p) for ts, p in pending])
         with box:
-            box.execute("DELETE FROM occupancy")
+            box.executemany(
+                "DELETE FROM occupancy WHERE ts = ? AND people = ?", [tuple(r) for r in pending]
+            )
     logger.info("Flushed %d buffered occupancy samples to Postgres", len(pending))
     return len(pending)
 
 
-def insert_occupancy(ts: datetime, people: int) -> None:
-    """Store one sample (overwriting the same minute). Falls back to the local
-    outbox when Postgres is unreachable, so a database outage loses no data."""
+def insert_occupancy(ts: datetime, people: int) -> bool:
+    """Store one sample (overwriting the same minute). Returns True when it
+    reached Postgres; on any database error it goes to the local outbox instead
+    (returns False), so an outage, a read-only server or a missing table during
+    a restore loses no data."""
     ts = ts.replace(second=0, microsecond=0)
     try:
         flush_outbox()
         _write_occupancy([(ts, people)])
-    except (psycopg.OperationalError, RuntimeError) as exc:
-        logger.warning("Postgres unavailable (%s); buffering sample locally", exc)
-        with closing(_outbox()) as box, box:
-            box.execute(
-                "INSERT INTO occupancy (ts, people) VALUES (?, ?)"
-                " ON CONFLICT(ts) DO UPDATE SET people=excluded.people",
-                (ts.strftime(_TS_FORMAT), people),
-            )
+        return True
+    except (psycopg.Error, RuntimeError) as exc:
+        logger.warning("Postgres write failed (%s); buffering sample locally", exc)
+        buffer_occupancy(ts, people)
+        return False
+
+
+def buffer_occupancy(ts: datetime, people: int) -> None:
+    """Put one sample into the local outbox (flushed on the next good write)."""
+    with closing(_outbox()) as box, box:
+        box.execute(
+            "INSERT INTO occupancy (ts, people) VALUES (?, ?)"
+            " ON CONFLICT(ts) DO UPDATE SET people=excluded.people",
+            (ts.replace(second=0, microsecond=0).strftime(_TS_FORMAT), people),
+        )
+
+
+def buffered_count() -> int:
+    """Number of samples waiting in the local outbox."""
+    if not Path(_outbox_path()).exists():
+        return 0
+    with closing(_outbox()) as box:
+        row = box.execute("SELECT count(*) FROM occupancy").fetchone()
+    return int(row[0]) if row else 0
 
 
 def fetch_occupancy() -> list[tuple[datetime, int]]:
@@ -313,6 +363,11 @@ def clear_digest_state() -> None:
 # >>>>>>>>>> LEGACY IMPORT <<<<<<<<<< #
 
 
+def legacy_import_pending(path: str) -> bool:
+    """True while a legacy SQLite file exists that has not been imported yet."""
+    return Path(path).exists() and not Path(f"{path}.imported").exists()
+
+
 def import_legacy_sqlite(path: str) -> tuple[int, int] | None:
     """One-time copy of the pre-Postgres ``ntk.sqlite`` (occupancy + weather).
 
@@ -321,7 +376,7 @@ def import_legacy_sqlite(path: str) -> tuple[int, int] | None:
     starts skip it. The SQLite file itself is left untouched as a cold copy.
     Returns ``(occupancy_rows, weather_rows)`` or ``None`` when there is nothing to do."""
     marker = Path(f"{path}.imported")
-    if not Path(path).exists() or marker.exists():
+    if not legacy_import_pending(path):
         return None
     with closing(sqlite3.connect(path)) as src:
         occ = [
@@ -341,11 +396,21 @@ def import_legacy_sqlite(path: str) -> tuple[int, int] | None:
             " ON CONFLICT (ts) DO NOTHING",
             weather,
         )
-        present = cur.execute(
-            "SELECT count(*) FROM occupancy WHERE ts = ANY(%s)", ([ts for ts, _ in occ],)
+        # Compare against the server-side cast so local times that collapse onto
+        # one instant (e.g. inside the spring-forward gap) count once.
+        stamps = [ts for ts, _ in occ]
+        expected = cur.execute(
+            "SELECT count(DISTINCT t) FROM unnest(%s::timestamptz[]) AS t", (stamps,)
         ).fetchone()
-    if present is None or present[0] != len(occ):
-        raise RuntimeError(f"Legacy import incomplete: {present} of {len(occ)} rows present")
+        present = cur.execute(
+            "SELECT count(*) FROM occupancy WHERE ts = ANY(%s::timestamptz[])", (stamps,)
+        ).fetchone()
+    if present is None or expected is None or present[0] != expected[0]:
+        raise RuntimeError(f"Legacy import incomplete: {present} of {expected} instants present")
+    if expected[0] != len(occ):
+        logger.warning(
+            "Legacy import: %d local times map to an existing instant", len(occ) - expected[0]
+        )
     marker.write_text(datetime.now().isoformat(), encoding="utf-8")
     _cache.reset()
     logger.info("Imported legacy SQLite: %d occupancy, %d weather rows", len(occ), len(weather))

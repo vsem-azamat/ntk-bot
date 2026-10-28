@@ -6,11 +6,13 @@ set -eu
 BACKUP_DIR=/backups
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-30}"
 RUN_AT_UTC="${BACKUP_AT_UTC:-03:40}"
+DUMP_TIMEOUT_S=1800
+export PGCONNECT_TIMEOUT=10
 
 backup() {
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   tmp="$BACKUP_DIR/.ntk-$stamp.dump.tmp"
-  if pg_dump --format=custom --no-owner --file="$tmp" "$DATABASE_URL"; then
+  if timeout "$DUMP_TIMEOUT_S" pg_dump --format=custom --no-owner --file="$tmp" "$DATABASE_URL"; then
     chmod 600 "$tmp"
     mv "$tmp" "$BACKUP_DIR/ntk-$stamp.dump"
     echo "[db-backup] wrote ntk-$stamp.dump ($(du -h "$BACKUP_DIR/ntk-$stamp.dump" | cut -f1))"
@@ -29,7 +31,7 @@ seconds_until_next_run() {
 }
 
 mkdir -p "$BACKUP_DIR"
-# A dump right after (re)deploy proves credentials and TLS work.
+# A dump whenever the container (re)starts proves credentials and TLS work.
 backup
 while true; do
   sleep "$(seconds_until_next_run)"
