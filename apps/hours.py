@@ -52,3 +52,25 @@ def day_type(day: date) -> str:
     if day.weekday() == 4:
         return "fri"
     return "mon_thu"
+
+
+# Step of the forecast grid; the reference curves use the same buckets.
+GRID_STEP_MIN = 10
+FORECAST_STEP = timedelta(minutes=GRID_STEP_MIN)
+
+
+def forecast_grid(day: date) -> list[datetime]:
+    """Timestamps of the served forecast: opening time until midnight, 10-min steps."""
+    out: list[datetime] = []
+    cur, end = opens_at(day), day_end(day)
+    while cur < end:
+        out.append(cur)
+        cur += FORECAST_STEP
+    return out
+
+
+def usable_samples(rows: list[tuple[datetime, int]]) -> list[tuple[datetime, int]]:
+    """Keep samples the forecaster can trust: non-zero counts taken after the
+    day's opening time. Zeros mean closed / no reading; pre-opening samples are
+    the previous night's counter residue."""
+    return [(dt, c) for dt, c in rows if c != 0 and is_open_sample(dt)]
