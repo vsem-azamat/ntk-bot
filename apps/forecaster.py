@@ -57,6 +57,9 @@ CATBOOST_PARAMS: dict[str, object] = {
     "iterations": 500,
     "depth": 6,
     "learning_rate": 0.08,
+    # The bot shares its host with other services; the daily retrain must not
+    # take every core.
+    "thread_count": 2,
 }
 # Walk-forward gate: this many consecutive windows of this length right before
 # the training end; each window is forecast by a model fitted before it.
