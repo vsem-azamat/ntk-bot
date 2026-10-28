@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from apps.hours import day_end, opens_at
 from apps.predictModels import predictModels
 
 # Minimal "clean" palette — one ink tone, one accent, muted secondary text.
@@ -62,13 +63,8 @@ class PlotGraphs:
     ) -> tuple[Figure, Axes]:
         """Minimal occupancy chart: real data + prediction median + p10–p90 band."""
         target_day = target_day or datetime.now()
-        start = target_day.replace(
-            hour=10 if target_day.isoweekday() >= 6 else 8,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        end = start + timedelta(hours=18)
+        start = opens_at(target_day.date())
+        end = day_end(target_day.date())
 
         x_times, y_quantities = await self.get_ntk_data(start, end)
         forecast = await predictModels.predict_day(target_day)

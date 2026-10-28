@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from apps.features import ObsContext
-from apps.predictModels import drop_closed_hours
+from apps.predictModels import usable_samples
 from bot import db
 from scripts.experiments.backtest import aggregate, score_day
 from scripts.experiments.candidates import Candidate
@@ -40,7 +40,7 @@ def main() -> None:
     ap.add_argument("--max-train-days", type=int, default=None)
     args = ap.parse_args()
 
-    rows = drop_closed_hours(db.fetch_occupancy())
+    rows = usable_samples(db.fetch_occupancy())
     ctx = ObsContext.from_rows(rows)
     weather = db.fetch_weather(rows[0][0], rows[-1][0])
     days = sorted({dt.date() for dt, _ in rows})

@@ -34,10 +34,12 @@ jobs:
       SUPER_ADMINS: ${{ secrets.SUPER_ADMINS }}
       DELTA_TIME: ${{ secrets.DELTA_TIME || '20' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-4o' }}
+      OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-6-luna' }}
       ANSWER_PROBABILITY: ${{ secrets.ANSWER_PROBABILITY || '0.025' }}
       DIGEST_ENABLED: ${{ secrets.DIGEST_ENABLED || 'false' }}
       DIGEST_CHAT_ID: ${{ secrets.DIGEST_CHAT_ID }}
+      ALERT_CHAT_ID: ${{ secrets.ALERT_CHAT_ID }}
+      ALERT_THREAD_ID: ${{ secrets.ALERT_THREAD_ID }}
     steps:
       - name: Checkout workflow run SHA
         if: github.event_name == 'workflow_run'
@@ -148,6 +150,8 @@ jobs:
             echo "ANSWER_PROBABILITY=${ANSWER_PROBABILITY}"
             echo "DIGEST_ENABLED=${DIGEST_ENABLED}"
             [ -n "$DIGEST_CHAT_ID" ] && echo "DIGEST_CHAT_ID=${DIGEST_CHAT_ID}"
+            [ -n "$ALERT_CHAT_ID" ] && echo "ALERT_CHAT_ID=${ALERT_CHAT_ID}"
+            [ -n "$ALERT_THREAD_ID" ] && echo "ALERT_THREAD_ID=${ALERT_THREAD_ID}"
             echo "DATA_DIR=/data"
           } > "$tmp_env"
           rsync -az --chmod=F600 \

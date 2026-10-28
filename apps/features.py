@@ -7,15 +7,15 @@ may be NaN (CatBoost handles NaN natively).
 """
 
 import bisect
-import functools
 import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Literal, overload
 
-import holidays
 import numpy as np
+
+from apps.hours import is_holiday
 
 FEATURE_NAMES = [
     "minute_sin",
@@ -142,17 +142,12 @@ class ObsContext:
         return ObsContext(by_day=new)
 
 
-@functools.lru_cache(maxsize=8)
-def _cz_holidays(year: int) -> holidays.HolidayBase:
-    return holidays.CZ(years=year)
-
-
 def regime_features(now: datetime, ctx: ObsContext, trailing_days: int = 14) -> dict:
     """Empirical 'academic calendar': trailing occupancy level (exam vs break)
     and a Czech public-holiday flag. Trailing level ignores the current day."""
     trailing_level = ctx.trailing_level(now.date(), trailing_days)
-    is_holiday = 1.0 if now.date() in _cz_holidays(now.year) else 0.0
-    return {"trailing_level": trailing_level, "is_holiday": is_holiday}
+    holiday = 1.0 if is_holiday(now.date()) else 0.0
+    return {"trailing_level": trailing_level, "is_holiday": holiday}
 
 
 _REGIME_NAMES = ["trailing_level", "is_holiday"]

@@ -17,3 +17,31 @@ def test_catboost_loses_when_worse_overall():
     cat = {"mae": 41.0, "near_mae": 10.0}
     clim = {"mae": 40.0, "near_mae": 35.0}
     assert better_than_baseline(cat, clim) is False
+
+
+from apps.predictModels import choose_model  # noqa: E402
+
+
+def test_incumbent_kept_on_marginal_loss():
+    cat = {"mae": 101.6, "near_mae": 102.1}
+    clim = {"mae": 98.4, "near_mae": 101.7}
+    assert choose_model(cat, clim, "catboost") == "catboost"
+    assert (
+        choose_model(
+            {"mae": 98.4, "near_mae": 90.0}, {"mae": 101.6, "near_mae": 99.0}, "climatology"
+        )
+        == "climatology"
+    )
+
+
+def test_switch_on_clear_win():
+    assert (
+        choose_model({"mae": 120.0, "near_mae": 99.0}, {"mae": 100.0, "near_mae": 90.0}, "catboost")
+        == "climatology"
+    )
+    assert (
+        choose_model(
+            {"mae": 80.0, "near_mae": 70.0}, {"mae": 100.0, "near_mae": 90.0}, "climatology"
+        )
+        == "catboost"
+    )

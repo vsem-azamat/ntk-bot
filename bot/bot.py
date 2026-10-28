@@ -33,7 +33,7 @@ async def on_startup(bot: Bot) -> None:
     # weather backfill + model retraining (training only on a cold start or once
     # a day, never on every restart).
     asyncio.create_task(heartbeat_loop())
-    asyncio.create_task(receive_ntk_data(cnfg.DELTA_TIME_FOR_RECIEVE_NTK))
+    asyncio.create_task(receive_ntk_data(bot, cnfg.DELTA_TIME_FOR_RECIEVE_NTK))
     asyncio.create_task(daily_maintenance_loop())
     asyncio.create_task(morning_digest_loop(bot))
 

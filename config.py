@@ -62,9 +62,15 @@ class Config:
     DIGEST_ENABLED: bool = config("DIGEST_ENABLED", cast=bool, default=False)
     DIGEST_CHAT_ID: int = config("DIGEST_CHAT_ID", cast=int, default=ID_NTK_BIG_CHAT)
 
+    # >>>>>>>>>> ALERTS <<<<<<<<<< #
+    # Chat (and optional forum topic) for collector outage / recovery alerts.
+    # 0 disables delivery; alerts are then only logged.
+    ALERT_CHAT_ID: int = config("ALERT_CHAT_ID", cast=int, default=0)
+    ALERT_THREAD_ID: int = config("ALERT_THREAD_ID", cast=int, default=0)
+
     # >>>>>>>>>> OPENROUTER <<<<<<<<<< #
     OPENROUTER_API_KEY: str = config("OPENROUTER_API_KEY", cast=str, default="")
-    OPENROUTER_MODEL: str = config("OPENROUTER_MODEL", cast=str, default="openai/gpt-4o")
+    OPENROUTER_MODEL: str = config("OPENROUTER_MODEL", cast=str, default="openai/gpt-6-luna")
     INSTRUCTIONS: str = _load_text(INSTRUCTIONS_PATH)
     GPT_ANSWER_PROBABILITY: float = config("ANSWER_PROBABILITY", cast=float, default=0.025)
 

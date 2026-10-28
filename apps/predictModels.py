@@ -21,6 +21,7 @@ from catboost import CatBoostRegressor, Pool
 
 from apps.baseline import build_climatology, climatology_predict
 from apps.features import ObsContext, WeatherRow, build_matrix, build_training_matrix
+from apps.hours import day_end, is_open_sample, opens_at
 from config import cnfg
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,9 @@ _TRAIN_CUTS: tuple[time | None, ...] = (None, time(10, 0), time(12, 0), time(14,
 _QUANTILES = {"p10": _LO_ALPHA, "p50": 0.5, "p90": _HI_ALPHA}
 _CHOICE_FILE = "model_choice"
 _HOLDOUT_WEEKS = 4
+# The holdout is a single noisy window, so the served model only changes when the
+# challenger wins by this relative MAE margin; otherwise the incumbent stays.
+_SWITCH_MARGIN = 0.05
 
 
 @dataclass
@@ -56,9 +60,11 @@ def _choice_path() -> str:
     return str(Path(cnfg.DATA_DIR) / _CHOICE_FILE)
 
 
-def drop_closed_hours(rows: list[tuple[datetime, int]]) -> list[tuple[datetime, int]]:
-    """Drop samples with a zero count (library closed / no reading)."""
-    return [(dt, c) for dt, c in rows if c != 0]
+def usable_samples(rows: list[tuple[datetime, int]]) -> list[tuple[datetime, int]]:
+    """Keep samples the model can trust: non-zero counts taken after the day's
+    opening time. Zeros mean closed / no reading; pre-opening samples are the
+    previous night's counter residue (see ``apps.hours``)."""
+    return [(dt, c) for dt, c in rows if c != 0 and is_open_sample(dt)]
 
 
 def time_split(
@@ -72,17 +78,12 @@ def time_split(
 
 
 def _grid(target_day: datetime) -> list[datetime]:
-    """Plot-matching grid: 08:00 (10:00 on weekends) for 18 h at 10-min steps."""
-    start = target_day.replace(
-        hour=10 if target_day.isoweekday() >= 6 else 8,
-        minute=0,
-        second=0,
-        microsecond=0,
-    )
-    end = start + timedelta(hours=18)
+    """Plot-matching grid: opening time until midnight at 10-min steps."""
+    start = opens_at(target_day.date())
+    end = day_end(target_day.date())
     out: list[datetime] = []
     cur = start
-    while cur <= end:
+    while cur < end:
         out.append(cur)
         cur += timedelta(minutes=10)
     return out
@@ -122,9 +123,33 @@ def _conditioned_mae(pred: list[float], actual: np.ndarray, feats) -> float:
 
 
 def better_than_baseline(cat: dict, clim: dict) -> bool:
-    """Ship CatBoost only if it wins overall MAE AND does not regress the near-term
-    (conditioned) error. Both dicts carry at least ``mae`` and ``near_mae``."""
+    """CatBoost beats the baseline if it wins overall MAE AND does not regress the
+    near-term (conditioned) error. Both dicts carry at least ``mae`` and ``near_mae``."""
     return cat["mae"] < clim["mae"] and cat["near_mae"] <= clim["near_mae"]
+
+
+def choose_model(cat: dict, clim: dict, incumbent: str, margin: float = _SWITCH_MARGIN) -> str:
+    """Pick the served model with hysteresis: the challenger must beat the
+    incumbent's overall MAE by ``margin`` (relative) to replace it, so a coin-flip
+    holdout does not swap the forecast shape every day."""
+    if incumbent == "catboost":
+        return "climatology" if clim["mae"] < cat["mae"] * (1 - margin) else "catboost"
+    if better_than_baseline(cat, clim) and cat["mae"] < clim["mae"] * (1 - margin):
+        return "catboost"
+    return "climatology"
+
+
+def _climatology_on(rows: list[tuple[datetime, int]], timestamps: list[datetime]) -> list[float]:
+    """Baseline p50 for ``timestamps``, built per day from the days before it."""
+    out: list[float] = [0.0] * len(timestamps)
+    by_day: dict = {}
+    for i, ts in enumerate(timestamps):
+        by_day.setdefault(ts.date(), []).append(i)
+    for day, idxs in by_day.items():
+        _, p50, _ = climatology_predict(build_climatology(rows, day), [timestamps[i] for i in idxs])
+        for i, v in zip(idxs, p50, strict=True):
+            out[i] = v
+    return out
 
 
 class PredictModels:
@@ -133,7 +158,7 @@ class PredictModels:
         persist both the models and the ship decision."""
         from bot import db
 
-        rows = drop_closed_hours(db.fetch_occupancy())
+        rows = usable_samples(db.fetch_occupancy())
         if len(rows) <= 50:
             logger.info("Not enough data to train (%d rows); baseline only", len(rows))
             self._write_choice("climatology")
@@ -172,8 +197,7 @@ class PredictModels:
             return
 
         cat_p50 = await asyncio.to_thread(self._predict_X, "p50", val_feats.X)
-        clim = build_climatology(train)
-        _, clim_p50, _ = climatology_predict(clim, val_ts)
+        clim_p50 = _climatology_on(rows, val_ts)
 
         cat_metrics = {
             "mae": _mae(cat_p50, val_y),
@@ -183,13 +207,16 @@ class PredictModels:
             "mae": _mae(clim_p50, val_y),
             "near_mae": _conditioned_mae(clim_p50, val_y, val_feats),
         }
-        choice = "catboost" if better_than_baseline(cat_metrics, clim_metrics) else "climatology"
+        incumbent = self._read_choice()
+        choice = choose_model(cat_metrics, clim_metrics, incumbent)
         logger.info(
-            "Holdout — catboost(mae=%.2f near=%.2f) climatology(mae=%.2f near=%.2f) -> %s",
+            "Holdout — catboost(mae=%.2f near=%.2f) climatology(mae=%.2f near=%.2f)"
+            " incumbent=%s -> %s",
             cat_metrics["mae"],
             cat_metrics["near_mae"],
             clim_metrics["mae"],
             clim_metrics["near_mae"],
+            incumbent,
             choice,
         )
         self._write_choice(choice)
@@ -256,7 +283,7 @@ class PredictModels:
 
         target_day = target_day or datetime.now()
         grid = _grid(target_day)
-        rows = drop_closed_hours(db.fetch_occupancy())
+        rows = usable_samples(db.fetch_occupancy())
         ctx = ObsContext.from_rows(rows)
 
         use_catboost = self._read_choice() == "catboost" and self._catboost_available()
@@ -270,7 +297,7 @@ class PredictModels:
                 weather = {}
             p10, p50, p90 = await asyncio.to_thread(self._predict_catboost, grid, weather, ctx)
         else:
-            clim = build_climatology(rows)
+            clim = build_climatology(rows, target_day.date())
             p10, p50, p90 = climatology_predict(clim, grid)
 
         # Anchor the band onto the latest real sample observed so far today (if any),
