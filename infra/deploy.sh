@@ -11,6 +11,12 @@ docker compose version >/dev/null 2>&1 || { echo "docker compose plugin is requi
 
 dc() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 
+# Bind-mounted by the db-backup service; create it as the deploy user so Docker
+# does not create it root-owned.
+mkdir -p "$ROOT_DIR/backups"
+chmod 700 "$ROOT_DIR/backups"
+[ -f "$ROOT_DIR/db-ca.crt" ] || { echo "Missing database CA: $ROOT_DIR/db-ca.crt" >&2; exit 1; }
+
 echo "[deploy] validating compose configuration..."
 dc config >/dev/null
 
