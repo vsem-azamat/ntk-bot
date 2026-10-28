@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from apps.alerts import CollectionMonitor, send_alert
 from apps.collect_time import generate_time_list
 from apps.parse_functions import get_ntk_quantity
 from apps.weather_history import backfill
@@ -31,20 +32,31 @@ async def heartbeat_loop(interval_seconds: float = 30) -> None:
         await asyncio.sleep(interval_seconds)
 
 
-async def receive_ntk_data(delta_minutes: int = 20) -> None:
-    """Collect occupancy data from the NTK website every ``delta_minutes``."""
+async def collect_once(bot, monitor: CollectionMonitor, now: datetime) -> None:
+    """Take one sample; feed the outcome to ``monitor`` and send any alert it raises."""
     from bot import db  # local import avoids a circular import at module load
 
+    try:
+        quantity_ntk = await get_ntk_quantity()
+        db.insert_occupancy(now, quantity_ntk)
+    except Exception as exc:
+        logger.exception("Failed to collect NTK occupancy data")
+        text = monitor.record_failure(now, exc)
+    else:
+        text = monitor.record_success(now)
+    if text:
+        await send_alert(bot, text)
+
+
+async def receive_ntk_data(bot, delta_minutes: int = 20) -> None:
+    """Collect occupancy data from the NTK website every ``delta_minutes``."""
     time_list = await generate_time_list(delta_minutes=delta_minutes)
+    monitor = CollectionMonitor()
 
     while True:
         current_time = datetime.now().strftime("%H:%M")
         if current_time in time_list:
-            try:
-                quantity_ntk = await get_ntk_quantity()
-                db.insert_occupancy(datetime.now(), quantity_ntk)
-            except Exception:
-                logger.exception("Failed to collect NTK occupancy data")
+            await collect_once(bot, monitor, datetime.now())
             await asyncio.sleep(delta_minutes * 60 - 60)
         else:
             await asyncio.sleep(1)

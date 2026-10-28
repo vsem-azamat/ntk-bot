@@ -30,7 +30,9 @@ Instead of a single number, three **quantile** models are trained, so the bot sh
 - **p50** — the median ("usually about this many people")
 - **p10 / p90** — the central 80% range ("normally somewhere between these")
 
-The models are [CatBoost](https://catboost.ai/) regressors (`loss=Quantile`), validated on a **time-based holdout** (the most recent weeks, never shuffled — so the past can't leak future data) and benchmarked against a **climatology baseline** (historical median per weekday × time-of-day). CatBoost ships only when it beats the baseline; otherwise — and on a cold start — the bot falls back to the baseline.
+The models are [CatBoost](https://catboost.ai/) regressors (`loss=Quantile`), validated on a **time-based holdout** (the most recent weeks, never shuffled — so the past can't leak future data) and benchmarked against a **recent-days baseline** (median curve of the last six days of the same type: Mon–Thu, Fri, Sat, Sun/holiday). The served model only changes when the challenger beats the incumbent by 5 %, so the forecast does not flip shape from day to day; on a cold start the bot uses the baseline.
+
+Only samples from opening time (08:00 on weekdays, 10:00 on weekends and Czech holidays) until midnight are used: after closing the library counter keeps a residue of a few hundred "people" until it resets at opening.
 
 Historical weather is backfilled once from [Open-Meteo](https://open-meteo.com/) and refreshed daily; the forecast for the target day feeds the prediction.
 
@@ -53,8 +55,9 @@ Data is written to `./ntk.sqlite` (override the directory with `DATA_DIR`).
 | `DELTA_TIME` | `20` | minutes between occupancy samples |
 | `SUPER_ADMINS` | — | comma-separated admin user IDs |
 | `OPENROUTER_API_KEY` | — | [OpenRouter](https://openrouter.ai/) key for random GPT replies |
-| `OPENROUTER_MODEL` | `openai/gpt-4o` | model slug for OpenRouter |
+| `OPENROUTER_MODEL` | `openai/gpt-6-luna` | model slug for OpenRouter |
 | `ANSWER_PROBABILITY` | `0.025` | chance of a random GPT reply |
+| `ALERT_CHAT_ID` / `ALERT_THREAD_ID` | — | chat / forum topic for collector outage alerts |
 
 ### Development
 

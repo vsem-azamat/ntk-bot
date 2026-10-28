@@ -66,10 +66,17 @@ def build_caption(forecast, current_count: int | None) -> str:
 
 def current_count(now: datetime) -> int | None:
     """Latest occupancy sample for today, or ``None`` if none yet."""
+    from apps.hours import is_open_sample
     from bot import db
 
     rows = db.fetch_occupancy()
-    if rows and rows[-1][0].date() == now.date() and rows[-1][1] > 0:
+    # Pre-opening samples are the previous night's counter residue, not people.
+    if (
+        rows
+        and rows[-1][0].date() == now.date()
+        and rows[-1][1] > 0
+        and is_open_sample(rows[-1][0])
+    ):
         return rows[-1][1]
     return None
 

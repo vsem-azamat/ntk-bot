@@ -30,8 +30,10 @@ GitHub):
 | `BOT_TOKEN` | Telegram bot token |
 | `SUPER_ADMINS` | comma-separated admin Telegram IDs |
 | `OPENROUTER_API_KEY` | optional; empty disables GPT replies |
-| `OPENROUTER_MODEL` | optional, default `openai/gpt-4o` |
+| `OPENROUTER_MODEL` | optional, default `openai/gpt-6-luna` |
 | `DELTA_TIME` / `ANSWER_PROBABILITY` | optional tuning |
+| `DIGEST_ENABLED` / `DIGEST_CHAT_ID` | optional morning digest switch and target chat |
+| `ALERT_CHAT_ID` / `ALERT_THREAD_ID` | optional; chat (and forum topic) for collector outage / recovery alerts |
 
 ## Runtime
 
@@ -43,5 +45,5 @@ GitHub):
 
 ## Re-training
 
-Models retrain on startup and can be retrained on demand by a super admin with
+Models retrain once a day (and on a cold start) and can be retrained on demand by a super admin with
 `/learn` in chat.

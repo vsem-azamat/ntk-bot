@@ -66,3 +66,20 @@ def test_predict_day_morning_has_no_anchor_jump(trained):
     forecast = asyncio.run(predictModels.predict_day(datetime(2025, 3, 6, 7, 0)))
     # Cold morning: nothing observed yet, so the peak stays in a sane range.
     assert max(forecast.p50) < 600
+
+
+def test_night_residue_does_not_anchor_the_morning_forecast(trained):
+    """The counter's 00:00-02:00 residue must not reach the as-of features or the
+    anchor: a 06:45 forecast is identical with and without it."""
+    from apps.predictModels import predictModels
+    from bot import db
+
+    asyncio.run(predictModels.learn_models())
+    morning = datetime(2025, 3, 6, 6, 45)
+    clean = asyncio.run(predictModels.predict_day(morning))
+    db.insert_occupancy(datetime(2025, 3, 6, 1, 40), 205)
+    db.insert_occupancy(datetime(2025, 3, 6, 2, 0), 203)
+    with_residue = asyncio.run(predictModels.predict_day(morning))
+    assert with_residue.p50 == clean.p50
+    assert with_residue.timestamps[0] == datetime(2025, 3, 6, 8, 0)
+    assert with_residue.timestamps[-1] == datetime(2025, 3, 6, 23, 50)

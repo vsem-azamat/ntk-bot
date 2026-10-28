@@ -89,6 +89,15 @@ def fetch_occupancy() -> list[tuple[datetime, int]]:
     return [(datetime.strptime(ts, _TS_FORMAT), people) for ts, people in rows]
 
 
+def latest_occupancy() -> tuple[datetime, int] | None:
+    """Return the most recent non-zero sample, or ``None`` if there is none."""
+    with closing(_connect()) as conn, conn:
+        row = conn.execute(
+            "SELECT ts, people FROM occupancy WHERE people > 0 ORDER BY ts DESC LIMIT 1"
+        ).fetchone()
+    return (datetime.strptime(row[0], _TS_FORMAT), row[1]) if row else None
+
+
 def upsert_weather(
     rows: list[tuple[datetime, float | None, float | None, float | None, float | None]],
 ) -> None:
